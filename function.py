@@ -323,16 +323,10 @@ class MultiUpload(Thread):
             localpath,remote_dir=self.queue.get()
             Upload(localpath,remote_dir)
 
-def LoadLocalFile():
-    with open(os.path.join(config_dir,'data.json'),'r') as f:
-        remotefiles=json.load(f)
-    return remotefiles
-
 def UploadDir(local_dir,remote_dir,threads=5):
     # items,globalDict,extDict=Dir(remote_dir)
-    items=LoadLocalFile()
     localfiles=os.listdir(local_dir)
-    waiting_files=[os.path.join(local_dir,i) for i in localfiles if not items.get(i)]
+    waiting_files=[os.path.join(local_dir,i) for i in localfiles if items.find({'name':i}).count()==0]
     queue=Queue()
     tasks=[]
     if not remote_dir.endswith('/'):
@@ -345,6 +339,7 @@ def UploadDir(local_dir,remote_dir,threads=5):
         tasks.append(t)
     for t in tasks:
         t.join()
+
 
 
 ########################
