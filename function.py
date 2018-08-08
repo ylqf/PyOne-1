@@ -164,7 +164,7 @@ def GetItem(url,grandid=0,parent=''):
                 item['parent']=parent
                 items.insert_one(item)
     if data.get('@odata.nextLink'):
-        GetItem(data.get('@odata.nextLink'))
+        GetItem(data.get('@odata.nextLink'),grandid,parent)
 
 
 def UpdateFile():
