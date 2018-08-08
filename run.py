@@ -73,7 +73,7 @@ def _getdownloadurl(id):
 def GetDownloadUrl(id):
     if rd.exists('downloadUrl:{}'.format(id)):
         downloadUrl,ftime=rd.get('downloadUrl:{}'.format(id)).split('####')
-        if time.time()-int(ftime)>=600:
+        if time.time()-int(ftime)>=downloadUrl_timeout:
             print('{} downloadUrl expired!'.format(id))
             downloadUrl=_getdownloadurl(id)
             ftime=int(time.time())
