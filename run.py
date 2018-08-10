@@ -148,7 +148,7 @@ def has_password(path):
             else:
                 f=items.find_one({'grandid':idx,'name':r,'parent':pid})
             pid=f['id']
-        data=items.find_one({'grandid':idx,'name':r,'parent':pid})
+        data=items.find_one({'grandid':idx+1,'name':'.password','parent':pid})
         if data:
             password=_remote_content(data['id']).strip()
     return password
