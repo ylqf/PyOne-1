@@ -124,12 +124,18 @@ def file_ico(item):
   return "insert_drive_file";
 
 def _remote_content(fileid):
-    downloadUrl=GetDownloadUrl(fileid)
-    if downloadUrl:
-        r=requests.get(downloadUrl)
-        return r.content
+    kc='{}:content'.format(fileid)
+    if rd.exists(kc):
+        return rd.get(kc)
     else:
-        return False
+        downloadUrl=GetDownloadUrl(fileid)
+        if downloadUrl:
+            r=requests.get(downloadUrl)
+            content=r.content
+            rd.set(kc,content)
+            return content
+        else:
+            return False
 
 
 def has_password(path):
