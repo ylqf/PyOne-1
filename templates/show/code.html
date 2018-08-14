@@ -2,16 +2,16 @@
 
 {%block content%}
 <style type="text/css" media="screen">
-    #editor { 
+    #editor {
         /*height:800px;*/
     }
 </style>
 <div class="mdui-container">
-<pre id="editor" ><?php echo htmlentities($content);?></pre>
+<pre id="editor" >{{content}}</pre>
 </div>
 <div class="mdui-textfield">
   <label class="mdui-textfield-label">下载地址</label>
-  <input class="mdui-textfield-input" type="text" value="<?php e($url);?>"/>
+  <input class="mdui-textfield-input" type="text" value="{{url}}"/>
 </div>
 <a href="<?php e($url);?>" class="mdui-fab mdui-fab-fixed mdui-ripple mdui-color-theme-accent"><i class="mdui-icon material-icons">file_download</i></a>
 
@@ -21,8 +21,8 @@
     var editor = ace.edit("editor");
     editor.setTheme("ace/theme/ambiance");
     editor.setFontSize(18);
-    editor.session.setMode("ace/mode/<?php e($language);?>");
-    
+    editor.session.setMode("ace/mode/{{language}}");
+
     //Autocompletion
     editor.setOptions({
         enableBasicAutocompletion: true,
