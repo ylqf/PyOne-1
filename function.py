@@ -8,7 +8,9 @@ if sys.version_info[0]==3:
 else:
     import urllib
 import os
+import re
 import time
+import shutil
 import humanize
 import StringIO
 from dateutil.parser import parse
@@ -16,23 +18,19 @@ from Queue import Queue
 from threading import Thread
 from config import *
 from pymongo import MongoClient
-
 ######mongodb
 client = MongoClient('localhost',27017)
-db=client.one
+db=client.one2
 items=db.items
 
 
 #######授权链接
-global app_url
 if od_type=='business':
     BaseAuthUrl='https://login.microsoftonline.com'
     ResourceID='https://api.office.com/discovery/'
-    app_url=''
 elif od_type=='business_21v':
     BaseAuthUrl='https://login.partner.microsoftonline.cn'
     ResourceID='00000003-0000-0ff1-ce00-000000000000'
-    app_url='https://2mm-my.sharepoint.cn/'  #世纪互联版需要自定义onedrive的域名,最后必须带/
 
 LoginUrl=BaseAuthUrl+'/common/oauth2/authorize?response_type=code\
 &client_id={client_id}&redirect_uri={redirect_uri}'.format(client_id=client_id,redirect_uri=urllib.quote(redirect_uri))
@@ -97,21 +95,21 @@ def GetAppUrl():
             app_url=f.read().strip()
         return app_url
     else:
-        if od_type=='business':
-            token=GetToken(Token_file='Atoken.json')
-            if token:
-                header={'Authorization': 'Bearer {}'.format(token)}
-                url='https://api.office.com/discovery/v2.0/me/services'
-                r=requests.get(url,headers=header)
-                retdata=json.loads(r.text)
-                if retdata.get('value'):
-                    return retdata.get('value')[0]['serviceResourceId']
-            return False
-        else:
-            return app_url
-
-if not GetToken():
-    app_url=GetAppUrl()
+        # if od_type=='business':
+        #     token=GetToken(Token_file='Atoken.json')
+        #     print 'token:',token
+        #     if token:
+        #         header={'Authorization': 'Bearer {}'.format(token)}
+        #         url='https://api.office.com/discovery/v2.0/me/services'
+        #         r=requests.get(url,headers=header)
+        #         retdata=json.loads(r.text)
+        #         print retdata
+        #         if retdata.get('value'):
+        #             return retdata.get('value')[0]['serviceResourceId']
+        #     return False
+        # else:
+        #     return app_url
+        return app_url
 
 ################################################################################
 ###############################onedrive操作函数#################################
@@ -123,48 +121,70 @@ def Dir(path='/'):
     app_url=GetAppUrl()
     if path=='/':
         BaseUrl=app_url+'_api/v2.0/me/drive/root/children?expand=thumbnails'
+        items.remove()
+        GetItem(BaseUrl)
     else:
         if path.endswith('/'):
             path=path[:-1]
-        BaseUrl=app_url+'_api/v2.0/me/drive/root:{}:/children?expand=thumbnails'.format(path)
-    items.remove()
-    GetItem(BaseUrl)
+        if path.startswith('/'):
+            path=path[1:]
+        parent_id=0
+        for idx,p in enumerate(path.split('/')):
+            if parent_id==0:
+                parent_id=items.find_one({'name':p,'grandid':idx})['id']
+            else:
+                parent_id=items.find_one({'name':p,'grandid':idx,'parent':parent_id})['id']
+            items.delete_many({'parent':parent_id})
+        BaseUrl=app_url+'_api/v2.0/me/drive/root:/{}:/children?expand=thumbnails'.format(path)
+        GetItem(url=BaseUrl,grandid=idx+1,parent=parent_id)
+
 
 def GetItem(url,grandid=0,parent=''):
+    time.sleep(0.5) #避免过快
+    app_url=GetAppUrl()
     token=GetToken()
     header={'Authorization': 'Bearer {}'.format(token)}
-    r=requests.get(url,headers=header)
-    data=json.loads(r.content)
-    values=data.get('value')
-    #print url
-    if len(values)>0:
-        for value in values:
-            item={}
-            if value.get('folder'):
-                item['type']='folder'
-                item['name']=convert2unicode(value['name'])
-                item['id']=convert2unicode(value['id'])
-                item['size']=humanize.naturalsize(value['size'], gnu=True)
-                item['lastModtime']=humanize.naturaldate(parse(value['lastModifiedDateTime']))
-                item['grandid']=grandid
-                item['parent']=parent
-                subfodler=items.insert_one(item)
-                if value.get('folder').get('childCount')==0:
-                    continue
-                else:
-                    url=app_url+'_api/v2.0/me'+value.get('parentReference').get('path')+'/'+value.get('name')+':/children?expand=thumbnails'
-                    GetItem(url,grandid+1,item['id'])
-            else:
-                item['type']='file'
-                item['name']=convert2unicode(value['name'])
-                item['id']=convert2unicode(value['id'])
-                item['size']=humanize.naturalsize(value['size'], gnu=True)
-                item['lastModtime']=humanize.naturaldate(parse(value['lastModifiedDateTime']))
-                item['grandid']=grandid
-                item['parent']=parent
-                items.insert_one(item)
-    if data.get('@odata.nextLink'):
-        GetItem(data.get('@odata.nextLink'),grandid,parent)
+    trytime=1
+    while 1:
+        try:
+            r=requests.get(url,headers=header)
+            data=json.loads(r.content)
+            values=data.get('value')
+            #print url
+            if len(values)>0:
+                for value in values:
+                    item={}
+                    if value.get('folder'):
+                        item['type']='folder'
+                        item['name']=convert2unicode(value['name'])
+                        item['id']=convert2unicode(value['id'])
+                        item['size']=humanize.naturalsize(value['size'], gnu=True)
+                        item['lastModtime']=humanize.naturaldate(parse(value['lastModifiedDateTime']))
+                        item['grandid']=grandid
+                        item['parent']=parent
+                        subfodler=items.insert_one(item)
+                        if value.get('folder').get('childCount')==0:
+                            continue
+                        else:
+                            url=app_url+'_api/v2.0/me'+value.get('parentReference').get('path')+'/'+value.get('name')+':/children?expand=thumbnails'
+                            GetItem(url,grandid+1,item['id'])
+                    else:
+                        item['type']='file'
+                        item['name']=convert2unicode(value['name'])
+                        item['id']=convert2unicode(value['id'])
+                        item['size']=humanize.naturalsize(value['size'], gnu=True)
+                        item['lastModtime']=humanize.naturaldate(parse(value['lastModifiedDateTime']))
+                        item['grandid']=grandid
+                        item['parent']=parent
+                        items.insert_one(item)
+            if data.get('@odata.nextLink'):
+                GetItem(data.get('@odata.nextLink'),grandid,parent)
+            break
+        except Exception as e:
+            trytime+=1
+            print('error to opreate GetItem("{}","{}","{}"),try times :{}, reason: {}'.format(url,grandid,parent,trytime,e))
+        if trytime>3:
+            break
 
 
 def UpdateFile():
@@ -231,13 +251,17 @@ def CreateUploadSession(path):
             "@microsoft.graph.conflictBehavior": "rename",
           }
         }
-    r=requests.post(url,headers=headers,data=json.dumps(data))
-    retdata=json.loads(r.content)
-    if r.status_code==409:
-        print('file exists')
+    try:
+        r=requests.post(url,headers=headers,data=json.dumps(data))
+        retdata=json.loads(r.content)
+        if r.status_code==409:
+            print('file exists')
+            return False
+        else:
+            return retdata
+    except Exception as e:
+        print('error to opreate CreateUploadSession("{}"),reason {}'.format(path,e))
         return False
-    else:
-        return retdata
 
 def UploadSession(uploadUrl, filepath, offset, length):
     token=GetToken()
@@ -248,36 +272,47 @@ def UploadSession(uploadUrl, filepath, offset, length):
         return False
     length=length if offset+length<size else size-offset
     endpos=offset+length-1 if offset+length<size else size-1
-    print('upload file {} from {} to {}'.format(filepath,offset,endpos))
+    print('upload file {} {}%'.format(filepath,round(float(endpos)/size*100,1)))
     filebin=_file_content(filepath,offset,length)
     headers={}
     # headers['Authorization']='bearer {}'.format(token)
     headers['Content-Length']=str(length)
     headers['Content-Range']='bytes {}-{}/{}'.format(offset,endpos,size)
-    r=requests.put(uploadUrl,headers=headers,data=filebin)
-    data=json.loads(r.content)
-    if r.status_code==202:
-        offset=data.get('nextExpectedRanges')[0].split('-')[0]
-        UploadSession(uploadUrl, filepath, offset, length)
-    elif data.get('@content.downloadUrl'):
-        print('upload success!')
-        return data.get('@content.downloadUrl')
-    else:
-        print('upload fail')
-        print(data.get('error').get('message'))
-        r=requests.get(uploadUrl)
-        if r.status_code==404:
-            print('please retry upload file {}'.format(filepath))
+    trytime=1
+    while 1:
+        try:
+            r=requests.put(uploadUrl,headers=headers,data=filebin)
+            data=json.loads(r.content)
+            if r.status_code==202:
+                offset=data.get('nextExpectedRanges')[0].split('-')[0]
+                UploadSession(uploadUrl, filepath, offset, length)
+            elif data.get('@content.downloadUrl'):
+                print('upload success!')
+                return data.get('@content.downloadUrl')
+            else:
+                print('upload fail')
+                print(data.get('error').get('message'))
+                r=requests.get(uploadUrl)
+                if r.status_code==404:
+                    print('please retry upload file {}'.format(filepath))
+                    requests.delete(uploadUrl)
+                    return False
+                data=json.loads(r.content)
+                if data.get('nextExpectedRanges'):
+                    offset=data.get('nextExpectedRanges')[0].split('-')[0]
+                    UploadSession(uploadUrl, filepath, offset, length)
+                else:
+                    print('please retry upload file {}'.format(filepath))
+                    requests.delete(uploadUrl)
+                    return False
+            break
+        except Exception as e:
+            trytime+=1
+            print('error to opreate UploadSession("{}","{}","{}","{}"), try times {}'.format(uploadUrl, filepath, offset, length,trytime))
+        if trytime>3:
             requests.delete(uploadUrl)
-            return False
-        data=json.loads(r.content)
-        if data.get('nextExpectedRanges'):
-            offset=data.get('nextExpectedRanges')[0].split('-')[0]
-            UploadSession(uploadUrl, filepath, offset, length)
-        else:
-            print('please retry upload file {}'.format(filepath))
-            requests.delete(uploadUrl)
-            return False
+            break
+    return False
 
 def Upload(filepath,remote_path=None):
     token=GetToken()
@@ -309,7 +344,7 @@ def Upload(filepath,remote_path=None):
                 UploadSession(uploadUrl,filepath,offset,length)
             else:
                 print(session_data)
-                print('create upload session fail!')
+                print('create upload session fail! {}'.format(remote_path))
                 return False
 
 
@@ -323,9 +358,13 @@ class MultiUpload(Thread):
             localpath,remote_dir=self.queue.get()
             Upload(localpath,remote_dir)
 
+
 def UploadDir(local_dir,remote_dir,threads=5):
-    # items,globalDict,extDict=Dir(remote_dir)
     localfiles=os.listdir(local_dir)
+    for f in localfiles:
+        if len(re.findall('[:/#]+',f))>0:
+            newf=os.path.join(local_dir,re.sub('[:/#]+','',f))
+            shutil.move(os.path.join(local_dir,f),newf)
     waiting_files=[os.path.join(local_dir,i) for i in localfiles if items.find({'name':i}).count()==0]
     queue=Queue()
     tasks=[]
@@ -339,7 +378,6 @@ def UploadDir(local_dir,remote_dir,threads=5):
         tasks.append(t)
     for t in tasks:
         t.join()
-
 
 
 ########################
