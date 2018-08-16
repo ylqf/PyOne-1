@@ -124,19 +124,24 @@ def Dir(path='/'):
         items.remove()
         GetItem(BaseUrl)
     else:
+        grandid=0
+        parent=''
         if path.endswith('/'):
             path=path[:-1]
         if path.startswith('/'):
             path=path[1:]
-        parent_id=0
-        for idx,p in enumerate(path.split('/')):
-            if parent_id==0:
-                parent_id=items.find_one({'name':p,'grandid':idx})['id']
-            else:
-                parent_id=items.find_one({'name':p,'grandid':idx,'parent':parent_id})['id']
-            items.delete_many({'parent':parent_id})
+        if items.find_one({'grandid':0,'type':'folder'}):
+            parent_id=0
+            for idx,p in enumerate(path.split('/')):
+                if parent_id==0:
+                    parent_id=items.find_one({'name':p,'grandid':idx})['id']
+                else:
+                    parent_id=items.find_one({'name':p,'grandid':idx,'parent':parent_id})['id']
+                items.delete_many({'parent':parent_id})
+            grandid=idx+1
+            parent=parent_id
         BaseUrl=app_url+'_api/v2.0/me/drive/root:/{}:/children?expand=thumbnails'.format(path)
-        GetItem(url=BaseUrl,grandid=idx+1,parent=parent_id)
+        GetItem(url=BaseUrl,grandid=grandid,parent=parent)
 
 
 def GetItem(url,grandid=0,parent=''):
