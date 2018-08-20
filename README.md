@@ -17,4 +17,4 @@
 3. **需要安装redis，MongoDB**
 
 ## 安装教程 ##
-请转移到我的博客查看安装教程](https://abbeyokgo.github.io/pyone-onedrive-part1)
+请转移到我的博客查看[安装教程](https://abbeyokgo.github.io/pyone-onedrive-part1)
