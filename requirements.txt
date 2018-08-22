@@ -4,3 +4,4 @@ redis
 pymongo 
 gunicorn
 humanize
+python-dateutil
