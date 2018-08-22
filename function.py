@@ -370,7 +370,23 @@ def UploadDir(local_dir,remote_dir,threads=5):
         if len(re.findall('[:/#]+',f))>0:
             newf=os.path.join(local_dir,re.sub('[:/#]+','',f))
             shutil.move(os.path.join(local_dir,f),newf)
-    waiting_files=[os.path.join(local_dir,i) for i in localfiles if items.find({'name':i}).count()==0]
+    if remote_dir=='/':
+        waiting_files=[os.path.join(local_dir,i) for i in localfiles if items.find({'name':i}).count()==0]
+    else:
+        if remote_dir.startswith('/'):
+            remote_dir=remote_dir[1:]
+        if items.find_one({'grandid':0,'type':'folder','name':remote_dir.split('/')[0]}):
+            parent_id=0
+            for idx,p in enumerate(remote_dir.split('/')):
+                if parent_id==0:
+                    parent_id=items.find_one({'name':p,'grandid':idx})['id']
+                else:
+                    parent_id=items.find_one({'name':p,'grandid':idx,'parent':parent_id})['id']
+            grandid=idx+1
+            parent=parent_id
+            waiting_files=[os.path.join(local_dir,i) for i in localfiles if items.find({'name':i,'grandid':grandid,'parent':parent}).count()==0]
+        else:
+            waiting_files=[os.path.join(local_dir,i) for i in localfiles]
     queue=Queue()
     tasks=[]
     if not remote_dir.endswith('/'):
@@ -383,6 +399,7 @@ def UploadDir(local_dir,remote_dir,threads=5):
         tasks.append(t)
     for t in tasks:
         t.join()
+
 
 
 ########################
