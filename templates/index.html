@@ -13,7 +13,7 @@
         {%for data in items%}
             {%if data['type']=='folder' %}
             <li class="mdui-list-item mdui-ripple">
-                <a href="{%if path!='/'%}{{path}}{%endif%}/{{data['name']}}">
+                <a href="{{url_for('.index',path=path+'/'+data['name'])}}">
                     <div class="mdui-col-xs-12 mdui-col-sm-7 mdui-text-truncate">
                         <i class="mdui-icon material-icons">folder_open</i> {{data['name']}} </div>
                     <div class="mdui-col-sm-3 mdui-text-right">{{data['lastModtime']}}</div>
