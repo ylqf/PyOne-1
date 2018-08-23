@@ -9,6 +9,9 @@ import random
 from function import *
 from redis import Redis
 import time
+import sys
+reload(sys)
+sys.setdefaultencoding("utf-8")
 #######flask
 app=Flask(__name__)
 
@@ -24,37 +27,40 @@ def md5(string):
 
 def FetchData(path='/',page=1,per_page=50):
     resp=[]
-    if path=='/':
-        total=items.find({'grandid':0}).count()
-        data=items.find({'grandid':0}).limit(per_page).skip((page-1)*per_page)
-        for d in data:
-            item={}
-            item['name']=d['name']
-            item['id']=d['id']
-            item['lastModtime']=d['lastModtime']
-            item['size']=d['size']
-            item['type']=d['type']
-            resp.append(item)
-    else:
-        route=path.split('/')
-        pid=0
-        for idx,r in enumerate(route):
-            if pid==0:
-                f=items.find_one({'grandid':idx,'name':r})
-            else:
-                f=items.find_one({'grandid':idx,'name':r,'parent':pid})
-            pid=f['id']
-        print {'grandid':idx,'name':r,'parent':pid}
-        total=items.find({'grandid':idx+1,'parent':pid}).count()
-        data=items.find({'grandid':idx+1,'parent':pid}).limit(per_page).skip((page-1)*per_page)
-        for d in data:
-            item={}
-            item['name']=d['name']
-            item['id']=d['id']
-            item['lastModtime']=d['lastModtime']
-            item['size']=d['size']
-            item['type']=d['type']
-            resp.append(item)
+    try:
+        if path=='/':
+            total=items.find({'grandid':0}).count()
+            data=items.find({'grandid':0}).limit(per_page).skip((page-1)*per_page)
+            for d in data:
+                item={}
+                item['name']=d['name']
+                item['id']=d['id']
+                item['lastModtime']=d['lastModtime']
+                item['size']=d['size']
+                item['type']=d['type']
+                resp.append(item)
+        else:
+            route=path.split('/')
+            pid=0
+            for idx,r in enumerate(route):
+                if pid==0:
+                    f=items.find_one({'grandid':idx,'name':r})
+                else:
+                    f=items.find_one({'grandid':idx,'name':r,'parent':pid})
+                pid=f['id']
+            total=items.find({'grandid':idx+1,'parent':pid}).count()
+            data=items.find({'grandid':idx+1,'parent':pid}).limit(per_page).skip((page-1)*per_page)
+            for d in data:
+                item={}
+                item['name']=d['name']
+                item['id']=d['id']
+                item['lastModtime']=d['lastModtime']
+                item['size']=d['size']
+                item['type']=d['type']
+                resp.append(item)
+    except:
+        resp=[]
+        total=0
     return resp,total
 
 
@@ -73,7 +79,7 @@ def _getdownloadurl(id):
 def GetDownloadUrl(id):
     if rd.exists('downloadUrl:{}'.format(id)):
         downloadUrl,ftime=rd.get('downloadUrl:{}'.format(id)).split('####')
-        if time.time()-int(ftime)>=downloadUrl_timeout:
+        if time.time()-int(ftime)>=600:
             print('{} downloadUrl expired!'.format(id))
             downloadUrl=_getdownloadurl(id)
             ftime=int(time.time())
@@ -138,28 +144,40 @@ def _remote_content(fileid):
         else:
             return False
 
-
 def has_password(path):
     if items.count()==0:
         return False
     password=False
-    if path=='/':
-        if items.find_one({'grandid':0,'name':'.password'}):
-            password=_remote_content(items.find_one({'grandid':0,'name':'.password'})['id']).strip()
-    else:
-        route=path.split('/')
-        pid=0
-        for idx,r in enumerate(route):
-            if pid==0:
-                f=items.find_one({'grandid':idx,'name':r})
-            else:
-                f=items.find_one({'grandid':idx,'name':r,'parent':pid})
-            pid=f['id']
-        data=items.find_one({'grandid':idx+1,'name':'.password','parent':pid})
-        if data:
-            password=_remote_content(data['id']).strip()
+    try:
+        if path=='/':
+            if items.find_one({'grandid':0,'name':'.password'}):
+                password=_remote_content(items.find_one({'grandid':0,'name':'.password'})['id']).strip()
+        else:
+            route=path.split('/')
+            pid=0
+            for idx,r in enumerate(route):
+                if pid==0:
+                    f=items.find_one({'grandid':idx,'name':r})
+                else:
+                    f=items.find_one({'grandid':idx,'name':r,'parent':pid})
+                pid=f['id']
+            data=items.find_one({'grandid':idx+1,'name':'.password','parent':pid})
+            print data
+            if data:
+                password=_remote_content(data['id']).strip()
+    except:
+        password=False
     return password
 
+
+def path_list(path):
+    if path.startswith('/'):
+        path=path[1:]
+    if path.endswith('/'):
+        path=path[:-1]
+    plist=path.split('/')
+    plist=['/']+plist
+    return plist
 
 ################################################################################
 ###################################试图函数#####################################
@@ -173,6 +191,8 @@ def before_request():
 @app.route('/<path:path>',methods=['POST','GET'])
 @app.route('/',methods=['POST','GET'])
 def index(path='/'):
+    if path=='favicon.ico':
+        return redirect('https://www.baidu.com/favicon.ico')
     code=request.args.get('code')
     page=request.args.get('page',1,type=int)
     password=has_password(path)
@@ -234,10 +254,10 @@ def show(fileid):
         elif ext in ['ogg','mp3','wav']:
             return render_template('show/audio.html',downloadUrl=downloadUrl,url=url)
         elif CodeType(ext) is not None:
-            content=requests.get(downloadUrl).content
+            content=_remote_content(fileid)
             return render_template('show/code.html',content=content,url=url,language=CodeType(ext))
         else:
-            content=requests.get(downloadUrl).content
+            content=_remote_content(fileid)
             return render_template('show/any.html',content=content)
     else:
         if sum([i in referrer for i in allow_site])>0:
@@ -248,8 +268,10 @@ def show(fileid):
 
 
 app.jinja_env.globals['FetchData']=FetchData
+app.jinja_env.globals['path_list']=path_list
+app.jinja_env.globals['enumerate']=enumerate
 app.jinja_env.globals['file_ico']=file_ico
-app.jinja_env.globals['title']='pyone'
+app.jinja_env.globals['title']='PyOne'
 ################################################################################
 #####################################启动#######################################
 ################################################################################
