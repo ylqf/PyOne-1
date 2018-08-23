@@ -171,6 +171,8 @@ def has_password(path):
 
 
 def path_list(path):
+    if path=='/':
+        return [path]
     if path.startswith('/'):
         path=path[1:]
     if path.endswith('/'):
