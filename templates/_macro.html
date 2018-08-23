@@ -28,7 +28,7 @@
         </a>
     </div>
 </div> -->
-<a class="mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme-accent mdui-fab-fixed_left" href="{% if pagination.has_prev %}{{ url_for(endpoint,page = pagination.page + 1, **kwargs) }}{% else %}#{% endif %}">
+<a class="mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme-accent mdui-fab-fixed_left" href="{% if pagination.has_prev %}{{ url_for(endpoint,page = pagination.page - 1, **kwargs) }}{% else %}#{% endif %}">
     <i class="mdui-icon material-icons">&#xe314;</i>
 </a>
 <a class="mdui-btn mdui-btn-raised mdui-ripple mdui-color-theme-accent mdui-fab-fixed" href="{% if pagination.has_next %}{{ url_for(endpoint,page = pagination.page + 1, **kwargs) }}{% else %}#{% endif %}">
