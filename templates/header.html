@@ -1,7 +1,11 @@
-<header class="mdui-appbar mdui-color-theme">
-    <div class="mdui-toolbar mdui-container">
-        <a href="/" class="mdui-typo-headline">{{title}}</a>
-        <i class="mdui-icon material-icons mdui-icon-dark" style="margin:0;">chevron_right</i>
-        <a href="/">/</a>
+<div class="mdui-container-fluid">
+    <div class="mdui-toolbar nexmoe-item">
+        <a href="/">{{title}}</a>
+        {%if path%}
+        {%for idx,p in enumerate(path_list(path))%}
+            <i class="mdui-icon material-icons mdui-icon-dark" style="margin:0;">chevron_right</i>
+            <a href="{{url_for('index',path='/'.join(path[:idx+1]))}}">{{p}}</a>
+        {%endfor%}
+        {%endif%}
     </div>
-</header>
+</div>
