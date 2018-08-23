@@ -10,6 +10,17 @@
                 <div class="mdui-col-sm-3 mdui-text-right">修改时间</div>
                 <div class="mdui-col-sm-2 mdui-text-right">大小</div>
             </li>
+            {%if path!='/'%}
+                <li class="mdui-list-item mdui-ripple">
+                    <a href="{{path_list(path)[-2]}}">
+                        <div class="mdui-col-xs-12 mdui-col-sm-7">
+                            <i class="mdui-icon material-icons">arrow_upward</i> ..
+                        </div>
+                        <div class="mdui-col-sm-3 mdui-text-right"></div>
+                        <div class="mdui-col-sm-2 mdui-text-right"></div>
+                    </a>
+                </li>
+                {%endif%}
         {%for data in items%}
             {%if data['type']=='folder' %}
             <li class="mdui-list-item mdui-ripple">
