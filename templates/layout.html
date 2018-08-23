@@ -79,6 +79,20 @@
     }
 
     img { width: 100%;height: auto;max-width: 60%; display: block; } 
+        /* 固定到右下角的 FAB 按钮 */
+    .mdui-fab-fixed_left {
+      position: fixed !important;
+      /* 手机平板上距离屏幕右下角 16px */
+      left: 16px;
+      bottom: 16px;
+    }
+    @media (min-width: 1024px) {
+      .mdui-fab-fixed_left {
+        /* 电脑上距离屏幕右下角 24px */
+        left: 24px;
+        bottom: 24px;
+      }
+    }
     </style>
 </head>
 
