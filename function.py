@@ -209,6 +209,18 @@ def FileExists(filename):
         return True
 
 ################################################上传文件
+def list_all_files(rootdir):
+    import os
+    _files = []
+    flist = os.listdir(rootdir) #列出文件夹下所有的目录与文件
+    for f in flist:
+        path = os.path.join(rootdir,f)
+        if os.path.isdir(path):
+            _files.extend(list_all_files(path))
+        if os.path.isfile(path):
+            _files.append(path)
+    return _files
+
 def _filesize(path):
     size=os.path.getsize(path)
     # print('{}\'s size {}'.format(path,size))
@@ -365,13 +377,19 @@ class MultiUpload(Thread):
 
 
 def UploadDir(local_dir,remote_dir,threads=5):
-    localfiles=os.listdir(local_dir)
+    print(u'geting file from dir {}'.format(local_dir))
+    localfiles=list_all_files(local_dir)
+    print(u'get {} files from dir {}'.format(len(localfiles),local_dir))
+    print(u'check filename')
     for f in localfiles:
-        if len(re.findall('[:/#]+',f))>0:
-            newf=os.path.join(local_dir,re.sub('[:/#]+','',f))
-            shutil.move(os.path.join(local_dir,f),newf)
+        dir_,fname=os.path.dirname(f),os.path.basename(f)
+        if len(re.findall('[:/#]+',fname))>0:
+            newf=os.path.join(dir_,re.sub('[:/#]+','',fname))
+            shutil.move(f,newf)
+    print(u'check repeat file')
     if remote_dir=='/':
-        waiting_files=[os.path.join(local_dir,i) for i in localfiles if items.find({'name':i}).count()==0]
+        cloud_files=dict([(i['name'],1) for i in items.find({})])
+        waiting_files=[i for i in localfiles if not cloud_files.get('i')]
     else:
         if remote_dir.startswith('/'):
             remote_dir=remote_dir[1:]
@@ -384,15 +402,23 @@ def UploadDir(local_dir,remote_dir,threads=5):
                     parent_id=items.find_one({'name':p,'grandid':idx,'parent':parent_id})['id']
             grandid=idx+1
             parent=parent_id
-            waiting_files=[os.path.join(local_dir,i) for i in localfiles if items.find({'name':i,'grandid':grandid,'parent':parent}).count()==0]
+            cloud_files=dict([(i['name'],1) for i in items.find({'grandid':grandid,'parent':parent})])
+            print len(cloud_files)
+            waiting_files=[os.path.join(local_dir,i) for i in localfiles if not cloud_files.get('i')]
         else:
             waiting_files=[os.path.join(local_dir,i) for i in localfiles]
     queue=Queue()
     tasks=[]
     if not remote_dir.endswith('/'):
         remote_dir+='/'
+    if local_dir.endswith('/'):
+        local_dir=local_dir[:-1]
+    print(u'insert tasks')
     for file in waiting_files:
-        queue.put((file,remote_dir))
+        dir_,fname=os.path.dirname(file),os.path.basename(file)
+        remote_path=remote_dir+dir_.replace(local_dir,'')+'/'+fname
+        remote_path=remote_path.replace('//','/')
+        queue.put((file,remote_path))
     for i in range(min(threads,queue.qsize())):
         t=MultiUpload(queue)
         t.start()
