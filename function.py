@@ -245,7 +245,7 @@ def _upload(filepath,remote_path): #remote_path like 'share/share.mp4'
     token=GetToken()
     headers={'Authorization':'bearer {}'.format(token)}
     url=app_url+'_api/v2.0/me/drive/root:/'+remote_path+':/content'
-    r=requests.put(url,headers=headers,files={'file':open(filepath,'rb')})
+    r=requests.put(url,headers=headers,data=open(filepath,'rb'))
     data=json.loads(r.content)
     if data.get('error'):
         print(data.get('error').get('message'))
