@@ -7,7 +7,7 @@
             {%if idx==len(path_list(path))-1%}
             <a href="#">{{p}}</a>
             {%else%}
-            <a href="{{url_for('index',path='/'.join(path[:idx+1]))}}">{{p}}</a>
+            <a href="{{url_for('.index',path='/'.join(path_list(path)[:idx+1]))}}">{{p}}</a>
             {%endif%}
         {%endfor%}
         {%endif%}
