@@ -257,6 +257,16 @@ def _upload(filepath,remote_path): #remote_path like 'share/share.mp4'
         print(data)
         return False
 
+def _GetAllFile(parent_id="",parent_path="",filelist=[]):
+    for f in db.items.find({'parent':parent_id}):
+        if f['type']=='folder':
+            _GetAllFile(f['id'],'/'.join([parent_path,f['name']]),filelist)
+        else:
+            fp='/'.join([parent_path,f['name']])
+            if fp.startswith('/'):
+                fp=base64.b64encode(fp[1:].encode('utf-8'))
+            filelist.append(fp)
+    return filelist
 
 
 def CreateUploadSession(path):
@@ -377,6 +387,8 @@ class MultiUpload(Thread):
 
 
 def UploadDir(local_dir,remote_dir,threads=5):
+    if not local_dir.endswith('/'):
+        local_dir=local_dir+'/'
     print(u'geting file from dir {}'.format(local_dir))
     localfiles=list_all_files(local_dir)
     print(u'get {} files from dir {}'.format(len(localfiles),local_dir))
@@ -384,47 +396,50 @@ def UploadDir(local_dir,remote_dir,threads=5):
     for f in localfiles:
         dir_,fname=os.path.dirname(f),os.path.basename(f)
         if len(re.findall('[:/#]+',fname))>0:
-            newf=os.path.join(dir_,re.sub('[:/#]+','',fname))
+            newf=os.path.join(dir_,re.sub('[:/#\|]+','',fname))
             shutil.move(f,newf)
+    localfiles=list_all_files(local_dir)
+    check_file_list=[]
+    for file in localfiles:
+        dir_,fname=os.path.dirname(file),os.path.basename(file)
+        remote_path=remote_dir+'/'+dir_.replace(local_dir,'')+'/'+fname
+        remote_path=remote_path.replace('//','/')
+        check_file_list.append((remote_path,file))
     print(u'check repeat file')
     if remote_dir=='/':
-        cloud_files=dict([(i['name'],1) for i in items.find({})])
-        waiting_files=[i for i in localfiles if not cloud_files.get('i')]
+        cloud_files=_GetAllFile()
     else:
         if remote_dir.startswith('/'):
             remote_dir=remote_dir[1:]
         if items.find_one({'grandid':0,'type':'folder','name':remote_dir.split('/')[0]}):
             parent_id=0
+            parent_path=''
             for idx,p in enumerate(remote_dir.split('/')):
                 if parent_id==0:
-                    parent_id=items.find_one({'name':p,'grandid':idx})['id']
+                    parent=items.find_one({'name':p,'grandid':idx})
+                    parent_id=parent['id']
+                    parent_path='/'.join([parent_path,parent['name']])
                 else:
-                    parent_id=items.find_one({'name':p,'grandid':idx,'parent':parent_id})['id']
+                    parent=items.find_one({'name':p,'grandid':idx,'parent':parent_id})
+                    parent_id=parent['id']
+                    parent_path='/'.join([parent_path,parent['name']])
             grandid=idx+1
-            parent=parent_id
-            cloud_files=dict([(i['name'],1) for i in items.find({'grandid':grandid,'parent':parent})])
-            print len(cloud_files)
-            waiting_files=[os.path.join(local_dir,i) for i in localfiles if not cloud_files.get('i')]
-        else:
-            waiting_files=[os.path.join(local_dir,i) for i in localfiles]
+            cloud_files=_GetAllFile(parent_id,parent_path)
+    cloud_files=dict([(i,i) for i in cloud_files])
     queue=Queue()
     tasks=[]
-    if not remote_dir.endswith('/'):
-        remote_dir+='/'
-    if local_dir.endswith('/'):
-        local_dir=local_dir[:-1]
-    print(u'insert tasks')
-    for file in waiting_files:
-        dir_,fname=os.path.dirname(file),os.path.basename(file)
-        remote_path=remote_dir+dir_.replace(local_dir,'')+'/'+fname
-        remote_path=remote_path.replace('//','/')
-        queue.put((file,remote_path))
+    for remote_path,file in check_file_list:
+        if not cloud_files.get(base64.b64encode(remote_path)):
+            queue.put((file,remote_path))
+    print "check_file_list {},cloud_files {},queue {}".format(len(check_file_list),len(cloud_files),queue.qsize())
     for i in range(min(threads,queue.qsize())):
         t=MultiUpload(queue)
         t.start()
         tasks.append(t)
     for t in tasks:
         t.join()
+
+
 
 
 
