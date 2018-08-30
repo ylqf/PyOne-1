@@ -287,6 +287,7 @@ def show(fileid):
 
 app.jinja_env.globals['FetchData']=FetchData
 app.jinja_env.globals['path_list']=path_list
+app.jinja_env.globals['len']=len
 app.jinja_env.globals['enumerate']=enumerate
 app.jinja_env.globals['file_ico']=file_ico
 app.jinja_env.globals['title']='PyOne'
