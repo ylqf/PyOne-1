@@ -249,22 +249,25 @@ def index(path='/'):
 
 @app.route('/file/<fileid>',methods=['GET','POST'])
 def show(fileid):
-    downloadUrl=GetDownloadUrl(fileid)
     if request.method=='POST':
         name=GetName(fileid)
         ext=name.split('.')[-1]
         url=request.url.replace(':80','').replace(':443','')
         if ext in ['csv','doc','docx','odp','ods','odt','pot','potm','potx','pps','ppsx','ppsxm','ppt','pptm','pptx','rtf','xls','xlsx']:
+            downloadUrl=GetDownloadUrl(fileid)
             url = 'https://view.officeapps.live.com/op/view.aspx?src='+urllib.quote(downloadUrl)
             return redirect(url)
         elif ext in ['bmp','jpg','jpeg','png','gif']:
+            downloadUrl=GetDownloadUrl(fileid)
             return render_template('show/image.html',downloadUrl=downloadUrl,url=url)
         elif ext in ['mp4','webm']:
+            downloadUrl=GetDownloadUrl(fileid)
             return render_template('show/video.html',downloadUrl=downloadUrl,url=url)
         elif ext in ['mp4','webm','avi','mpg', 'mpeg', 'rm', 'rmvb', 'mov', 'wmv', 'mkv', 'asf']:
             downloadUrl=downloadUrl.replace('thumbnail','videomanifest')+'&part=index&format=dash&useScf=True&pretranscode=0&transcodeahead=0'
             return render_template('show/video2.html',downloadUrl=downloadUrl,url=url)
         elif ext in ['ogg','mp3','wav']:
+            downloadUrl=GetDownloadUrl(fileid)
             return render_template('show/audio.html',downloadUrl=downloadUrl,url=url)
         elif CodeType(ext) is not None:
             content=_remote_content(fileid)
@@ -274,9 +277,11 @@ def show(fileid):
             return render_template('show/any.html',content=content)
     else:
         if sum([i in referrer for i in allow_site])>0:
+            downloadUrl=GetDownloadUrl(fileid)
             return redirect(downloadUrl)
         else:
             return abort(404)
+
 
 
 
