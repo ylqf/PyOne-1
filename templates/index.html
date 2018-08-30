@@ -3,13 +3,23 @@
 
 {%block content%}
 <div class="mdui-container-fluid">
-    <div class="mdui-row">
-        <ul class="mdui-list">
-            <li class="mdui-list-item th">
-                <div class="mdui-col-xs-12 mdui-col-sm-7">文件</div>
-                <div class="mdui-col-sm-3 mdui-text-right">修改时间</div>
-                <div class="mdui-col-sm-2 mdui-text-right">大小</div>
-            </li>
+    <div class="mdui-typo">
+          <label class="mdui-switch">
+            看图模式
+            <input type="checkbox" id="image_view" {%if image_mode==1%}checked{%endif%}/>
+            <i class="mdui-switch-icon"></i>
+            {%if image_mode==1%}(看图模式下只显示图片){%endif%}
+          </label>
+    </div>
+    {%if image_mode==0%}
+    <div class="nexmoe-item">
+        <div class="mdui-row">
+            <ul class="mdui-list">
+                <li class="mdui-list-item th">
+                    <div class="mdui-col-xs-12 mdui-col-sm-7">文件</div>
+                    <div class="mdui-col-sm-3 mdui-text-right">修改时间</div>
+                    <div class="mdui-col-sm-2 mdui-text-right">大小</div>
+                </li>
                 {%if path!='/'%}
                 <li class="mdui-list-item mdui-ripple">
                     <a href="{{url_for('.index',path='/'.join(path_list(path)[:-1]))}}">
@@ -21,29 +31,60 @@
                     </a>
                 </li>
                 {%endif%}
-        {%for data in items%}
-            {%if data['type']=='folder' %}
-            <li class="mdui-list-item mdui-ripple">
-                <a href="{{url_for('.index',path=path+'/'+data['name'])}}">
-                    <div class="mdui-col-xs-12 mdui-col-sm-7 mdui-text-truncate">
-                        <i class="mdui-icon material-icons">folder_open</i> {{data['name']}} </div>
-                    <div class="mdui-col-sm-3 mdui-text-right">{{data['lastModtime']}}</div>
-                    <div class="mdui-col-sm-2 mdui-text-right">{{data['size']}}</div>
-                </a>
-            </li>
-            {%else%}
-            <li class="mdui-list-item file mdui-ripple">
-                <a href="/file/{{data['id']}}" target="_blank">
-                    <div class="mdui-col-xs-12 mdui-col-sm-7 mdui-text-truncate">
-                        <i class="mdui-icon material-icons">{{file_ico(data)}}</i> {{data['name']}} </div>
-                    <div class="mdui-col-sm-3 mdui-text-right">{{data['lastModtime']}}</div>
-                    <div class="mdui-col-sm-2 mdui-text-right">{{data['size']}}</div>
-                </a>
-            </li>
-            {%endif%}
-        {%endfor%}
-        </ul>
+            {%for data in items%}
+                {%if data['type']=='folder' %}
+                <li class="mdui-list-item mdui-ripple">
+                    <a href="{{url_for('.index',path=path+'/'+data['name'])}}">
+                        <div class="mdui-col-xs-12 mdui-col-sm-7 mdui-text-truncate">
+                            <i class="mdui-icon material-icons">folder_open</i> {{data['name']}} </div>
+                        <div class="mdui-col-sm-3 mdui-text-right">{{data['lastModtime']}}</div>
+                        <div class="mdui-col-sm-2 mdui-text-right">{{data['size']}}</div>
+                    </a>
+                </li>
+                {%else%}
+                <li class="mdui-list-item file mdui-ripple">
+                    <a href="/file/{{data['id']}}" target="_blank">
+                        <div class="mdui-col-xs-12 mdui-col-sm-7 mdui-text-truncate">
+                            <i class="mdui-icon material-icons">{{file_ico(data)}}</i> {{data['name']}} </div>
+                        <div class="mdui-col-sm-3 mdui-text-right">{{data['lastModtime']}}</div>
+                        <div class="mdui-col-sm-2 mdui-text-right">{{data['size']}}</div>
+                    </a>
+                </li>
+                {%endif%}
+            {%endfor%}
+            </ul>
+        </div>
     </div>
+    {%else%}
+    <div class="nexmoe-item">
+        <div class="mdui-row">
+            {%if path!='/'%}
+                <li class="mdui-list-item mdui-ripple">
+                    <a href="{{url_for('.index',path='/'.join(path_list(path)[:-1]))}}">
+                        <div class="mdui-col-xs-12 mdui-col-sm-7">
+                            <i class="mdui-icon material-icons">arrow_upward</i> ..
+                        </div>
+                        <div class="mdui-col-sm-3 mdui-text-right"></div>
+                        <div class="mdui-col-sm-2 mdui-text-right"></div>
+                    </a>
+                </li>
+                {%endif%}
+            {%for data in items%}
+                {%if data['type']!='folder'%}
+                    {%if file_ico(data)=='image'%}
+                    <div class="mdui-col">
+                        <div class="mdui-grid-tile">
+                            <a href="/file/{{data['id']}}" target="_blank">
+                                <img src="/file/{{data['id']}}"/>
+                            </a>
+                        </div>
+                    </div>
+                    {%endif%}
+                {%endif%}
+            {%endfor%}
+        </div>
+    </div>
+    {%endif%}
 </div>
 
 <div class="mdui-center">
@@ -53,17 +94,35 @@
 </div>
 
 <script>
-$ = mdui.JQ;
-$(function() {
-    $('.file a').each(function() {
-        $(this).on('click', function() {
-            var form = $('<form target=_blank method=post></form>').attr('action', $(this).attr('href')).get(0);
-            $(document.body).append(form);
+var $$ = mdui.JQ;
+$$(function() {
+    $$('.file a').each(function() {
+        $$(this).on('click', function() {
+            var form = $$('<form target=_blank method=post></form>').attr('action', $$(this).attr('href')).get(0);
+            $$(document.body).append(form);
             form.submit();
-            $(form).remove();
+            $$(form).remove();
             return false;
         });
     });
+});
+
+function setCookie(c_name, value, exdays) {
+    var exdate = new Date();
+    exdate.setDate(exdate.getDate() + exdays);
+    var c_value = escape(value) + ((exdays == null) ? "" : "; expires=" + exdate.toUTCString());
+    document.cookie = c_name + "=" + c_value;
+}
+
+var ckname='image_mode'
+$('#image_view').change(function(){
+   if($(this).attr('checked')){
+        setCookie(ckname,1,1);
+        window.location.href="{{url_for('.index',path=path,image_mode=0)}}";
+   }else{
+        setCookie(ckname,0,1);
+        window.location.href="{{url_for('.index',path=path,image_mode=1)}}";
+   }
 });
 </script>
 {%endblock content%}
