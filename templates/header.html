@@ -4,7 +4,11 @@
         {%if path%}
         {%for idx,p in enumerate(path_list(path))%}
             <i class="mdui-icon material-icons mdui-icon-dark" style="margin:0;">chevron_right</i>
+            {%if idx==len(path_list(path))-1%}
+            <a href="#">{{p}}</a>
+            {%else%}
             <a href="{{url_for('index',path='/'.join(path[:idx+1]))}}">{{p}}</a>
+            {%endif%}
         {%endfor%}
         {%endif%}
     </div>
