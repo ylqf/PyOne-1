@@ -231,9 +231,20 @@ def index(path='/'):
             else:
                 subprocess.Popen('python function.py UpdateFile',shell=True)
                 return make_response('<h1>正在更新数据!</h1>')
-        resp,total = FetchData(path,page)
-        pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
-        return render_template('index.html',pagination=pagination,items=resp,path=path,endpoint='.index')
+        if request.args.get('image_mode'):
+            image_mode=request.args.get('image_mode',type=int)
+            resp,total = FetchData(path,page)
+            pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
+            resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,endpoint='.index'))
+            resp.set_cookie('image_mode',str(image_mode))
+        else:
+            image_mode=request.cookies.get('image_mode') if request.cookies.get('image_mode') is not None else 0
+            image_mode=int(image_mode)
+            resp,total = FetchData(path,page)
+            pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
+            resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,endpoint='.index'))
+            resp.set_cookie('image_mode',str(image_mode))
+        return resp
 
 
 @app.route('/file/<fileid>',methods=['GET','POST'])
