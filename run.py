@@ -273,8 +273,8 @@ def show(fileid):
             content=_remote_content(fileid)
             return render_template('show/code.html',content=content,url=url,language=CodeType(ext))
         else:
-            content=_remote_content(fileid)
-            return render_template('show/any.html',content=content)
+            downloadUrl=GetDownloadUrl(fileid)
+            return redirect(downloadUrl)
     else:
         if 'no-referrer' in allow_site:
             downloadUrl=GetDownloadUrl(fileid)
