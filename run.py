@@ -276,6 +276,9 @@ def show(fileid):
             content=_remote_content(fileid)
             return render_template('show/any.html',content=content)
     else:
+        if 'no-referrer' in allow_site:
+            downloadUrl=GetDownloadUrl(fileid)
+            return redirect(downloadUrl)
         if sum([i in referrer for i in allow_site])>0:
             downloadUrl=GetDownloadUrl(fileid)
             return redirect(downloadUrl)
