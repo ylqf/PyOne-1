@@ -154,6 +154,7 @@ def Dir(path='/'):
                 items.delete_many({'parent':parent_id})
             grandid=idx+1
             parent=parent_id
+        path=urllib.quote(path)
         BaseUrl=app_url+'_api/v2.0/me/drive/root:/{}:/children?expand=thumbnails'.format(path)
         queue=Queue()
         # queue.put(dict(url=BaseUrl,grandid=grandid,parent=parent,trytime=1))
