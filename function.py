@@ -256,7 +256,51 @@ def _upload(filepath,remote_path): #remote_path like 'share/share.mp4'
     else:
         print(data)
         return False
-
+    
+def _upload_part(uploadUrl, filepath, offset, length):
+    size=_filesize(filepath)
+    offset,length=map(int,(offset,length))
+    if offset>size:
+        print('offset must smaller than file size')
+        return {'status':'fail','msg':'params mistake','code':1}
+    length=length if offset+length<size else size-offset
+    endpos=offset+length-1 if offset+length<size else size-1
+    print('upload file {} {}%'.format(filepath,round(float(endpos)/size*100,1)))
+    filebin=_file_content(filepath,offset,length)
+    headers={}
+    # headers['Authorization']='bearer {}'.format(token)
+    headers['Content-Length']=str(length)
+    headers['Content-Range']='bytes {}-{}/{}'.format(offset,endpos,size)
+    try:
+        r=requests.put(uploadUrl,headers=headers,data=filebin)
+        data=json.loads(r.content)
+        if data.get('@content.downloadUrl'):
+            print(u'{} upload success!'.format(filepath))
+            return {'status':'success','msg':'all upload success','code':0}
+        elif r.status_code==202:
+            offset=data.get('nextExpectedRanges')[0].split('-')[0]
+            return {'status':'success','msg':'partition upload success','code':1,'offset':offset}
+        else:
+            print(data.get('error').get('message'))
+            trytime+=1
+            if trytime<=3:
+                return {'status':'fail'
+                        ,'msg':'please retry'
+                        ,'sys_msg':data.get('error').get('message')
+                        ,'code':2}
+            else:
+                return {'status':'fail'
+                        ,'msg':'retry times limit'
+                        ,'sys_msg':data.get('error').get('message')
+                        ,'code':3}
+    except Exception as e:
+        trytime+=1
+        print('error to opreate _upload_part("{}","{}","{}","{}"), try times {}'.format(uploadUrl, filepath, offset, length,trytime))
+        if trytime<=3:
+            return {'status':'fail','msg':'please retry','code':2}
+        else:
+            return {'status':'fail','msg':'retry times limit','code':3}
+    
 def _GetAllFile(parent_id="",parent_path="",filelist=[]):
     for f in db.items.find({'parent':parent_id}):
         if f['type']=='folder':
@@ -290,56 +334,27 @@ def CreateUploadSession(path):
         print('error to opreate CreateUploadSession("{}"),reason {}'.format(path,e))
         return False
 
-def UploadSession(uploadUrl, filepath, offset, length):
+def UploadSession(uploadUrl, filepath):
     token=GetToken()
-    size=_filesize(filepath)
-    offset,length=map(int,(offset,length))
-    if offset>size:
-        print('offset must smaller than file size')
-        return False
-    length=length if offset+length<size else size-offset
-    endpos=offset+length-1 if offset+length<size else size-1
-    print('upload file {} {}%'.format(filepath,round(float(endpos)/size*100,1)))
-    filebin=_file_content(filepath,offset,length)
-    headers={}
-    # headers['Authorization']='bearer {}'.format(token)
-    headers['Content-Length']=str(length)
-    headers['Content-Range']='bytes {}-{}/{}'.format(offset,endpos,size)
-    trytime=1
+    length=327680*10
+    offset=0
     while 1:
-        try:
-            r=requests.put(uploadUrl,headers=headers,data=filebin)
-            data=json.loads(r.content)
-            if r.status_code==202:
-                offset=data.get('nextExpectedRanges')[0].split('-')[0]
-                UploadSession(uploadUrl, filepath, offset, length)
-            elif data.get('@content.downloadUrl'):
-                print('upload success!')
-                return data.get('@content.downloadUrl')
-            else:
-                print('upload fail')
-                print(data.get('error').get('message'))
-                r=requests.get(uploadUrl)
-                if r.status_code==404:
-                    print('please retry upload file {}'.format(filepath))
-                    requests.delete(uploadUrl)
-                    return False
-                data=json.loads(r.content)
-                if data.get('nextExpectedRanges'):
-                    offset=data.get('nextExpectedRanges')[0].split('-')[0]
-                    UploadSession(uploadUrl, filepath, offset, length)
-                else:
-                    print('please retry upload file {}'.format(filepath))
-                    requests.delete(uploadUrl)
-                    return False
+        result=_upload_part(uploadUrl, filepath, offset, length)
+        code=result['code']
+        #上传完成
+        if code==0:
             break
-        except Exception as e:
-            trytime+=1
-            print('error to opreate UploadSession("{}","{}","{}","{}"), try times {}'.format(uploadUrl, filepath, offset, length,trytime))
-        if trytime>3:
-            requests.delete(uploadUrl)
+            return True
+        #分片上传成功
+        elif code==1:
+            offset=result['offset']
+        #错误，重试
+        elif code==2:
+            offset=offset
+        #重试超过3次，放弃
+        elif code==3:
             break
-    return False
+            return False
 
 def Upload(filepath,remote_path=None):
     token=GetToken()
@@ -366,9 +381,7 @@ def Upload(filepath,remote_path=None):
         else:
             if session_data.get('uploadUrl'):
                 uploadUrl=session_data.get('uploadUrl')
-                length=327680*10
-                offset=0
-                UploadSession(uploadUrl,filepath,offset,length)
+                UploadSession(uploadUrl,filepath)
             else:
                 print(session_data)
                 print('create upload session fail! {}'.format(remote_path))
