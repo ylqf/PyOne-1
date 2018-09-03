@@ -11,6 +11,7 @@ import os
 import re
 import time
 import shutil
+import base64
 import humanize
 import StringIO
 from dateutil.parser import parse
@@ -122,7 +123,20 @@ def Dir(path='/'):
     if path=='/':
         BaseUrl=app_url+'_api/v2.0/me/drive/root/children?expand=thumbnails'
         items.remove()
-        GetItem(BaseUrl)
+        queue=Queue()
+        # queue.put(dict(url=BaseUrl,grandid=grandid,parent=parent,trytime=1))
+        g=GetItemThread(queue)
+        g.GetItem(BaseUrl)
+        queue=g.queue
+        if queue.qsize()==0:
+            return
+        tasks=[]
+        for i in range(min(5,queue.qsize())):
+            t=GetItemThread(queue)
+            t.start()
+            tasks.append(t)
+        for t in tasks:
+            t.join()
     else:
         grandid=0
         parent=''
@@ -141,16 +155,46 @@ def Dir(path='/'):
             grandid=idx+1
             parent=parent_id
         BaseUrl=app_url+'_api/v2.0/me/drive/root:/{}:/children?expand=thumbnails'.format(path)
-        GetItem(url=BaseUrl,grandid=grandid,parent=parent)
+        queue=Queue()
+        # queue.put(dict(url=BaseUrl,grandid=grandid,parent=parent,trytime=1))
+        g=GetItemThread(queue)
+        g.GetItem(BaseUrl,grandid,parent,trytime)
+        queue=g.queue
+        if queue.qsize()==0:
+            return
+        tasks=[]
+        for i in range(min(5,queue.qsize())):
+            t=GetItemThread(queue)
+            t.start()
+            tasks.append(t)
+        for t in tasks:
+            t.join()
 
 
-def GetItem(url,grandid=0,parent=''):
-    time.sleep(0.5) #避免过快
-    app_url=GetAppUrl()
-    token=GetToken()
-    header={'Authorization': 'Bearer {}'.format(token)}
-    trytime=1
-    while 1:
+class GetItemThread(Thread):
+    def __init__(self,queue):
+        super(GetItemThread,self).__init__()
+        self.queue=queue
+
+    def run(self):
+        while 1:
+            time.sleep(0.5) #避免过快
+            info=self.queue.get()
+            url=info['url']
+            grandid=info['grandid']
+            parent=info['parent']
+            trytime=info['trytime']
+            self.GetItem(url,grandid,parent,trytime)
+            if self.queue.empty():
+                time.sleep(5) #再等5s
+                if self.queue.empty():
+                    break
+
+    def GetItem(self,url,grandid=0,parent='',trytime=1):
+        app_url=GetAppUrl()
+        token=GetToken()
+        print(u'getting files from url {}'.format(url))
+        header={'Authorization': 'Bearer {}'.format(token)}
         try:
             r=requests.get(url,headers=header)
             data=json.loads(r.content)
@@ -172,7 +216,7 @@ def GetItem(url,grandid=0,parent=''):
                             continue
                         else:
                             url=app_url+'_api/v2.0/me'+value.get('parentReference').get('path')+'/'+value.get('name')+':/children?expand=thumbnails'
-                            GetItem(url,grandid+1,item['id'])
+                            self.queue.put(dict(url=url,grandid=grandid+1,parent=item['id'],trytime=1))
                     else:
                         item['type']='file'
                         item['name']=convert2unicode(value['name'])
@@ -183,13 +227,15 @@ def GetItem(url,grandid=0,parent=''):
                         item['parent']=parent
                         items.insert_one(item)
             if data.get('@odata.nextLink'):
-                GetItem(data.get('@odata.nextLink'),grandid,parent)
-            break
+                self.queue.put(dict(url=data.get('@odata.nextLink'),grandid=grandid,parent=parent,trytime=1))
         except Exception as e:
             trytime+=1
             print('error to opreate GetItem("{}","{}","{}"),try times :{}, reason: {}'.format(url,grandid,parent,trytime,e))
-        if trytime>3:
-            break
+            if trytime<=3:
+                self.queue.put(dict(url=url,grandid=grandid,parent=parent,trytime=trytime))
+
+
+
 
 
 def UpdateFile():
@@ -245,7 +291,7 @@ def _upload(filepath,remote_path): #remote_path like 'share/share.mp4'
     token=GetToken()
     headers={'Authorization':'bearer {}'.format(token)}
     url=app_url+'_api/v2.0/me/drive/root:/'+remote_path+':/content'
-    r=requests.put(url,headers=headers,data=open(filepath,'rb'))
+    r=requests.put(url,headers=headers,files={'file':open(filepath,'rb')})
     data=json.loads(r.content)
     if data.get('error'):
         print(data.get('error').get('message'))
@@ -256,7 +302,7 @@ def _upload(filepath,remote_path): #remote_path like 'share/share.mp4'
     else:
         print(data)
         return False
-    
+
 def _upload_part(uploadUrl, filepath, offset, length):
     size=_filesize(filepath)
     offset,length=map(int,(offset,length))
@@ -300,7 +346,7 @@ def _upload_part(uploadUrl, filepath, offset, length):
             return {'status':'fail','msg':'please retry','code':2}
         else:
             return {'status':'fail','msg':'retry times limit','code':3}
-    
+
 def _GetAllFile(parent_id="",parent_path="",filelist=[]):
     for f in db.items.find({'parent':parent_id}):
         if f['type']=='folder':
@@ -311,6 +357,8 @@ def _GetAllFile(parent_id="",parent_path="",filelist=[]):
                 fp=base64.b64encode(fp[1:].encode('utf-8'))
             filelist.append(fp)
     return filelist
+
+
 
 
 def CreateUploadSession(path):
@@ -355,6 +403,8 @@ def UploadSession(uploadUrl, filepath):
         elif code==3:
             break
             return False
+
+
 
 def Upload(filepath,remote_path=None):
     token=GetToken()
@@ -451,8 +501,6 @@ def UploadDir(local_dir,remote_dir,threads=5):
         tasks.append(t)
     for t in tasks:
         t.join()
-
-
 
 
 
