@@ -59,6 +59,7 @@
     <div class="nexmoe-item">
         <div class="mdui-row">
             {%if path!='/'%}
+            <ul class="mdui-list">
                 <li class="mdui-list-item mdui-ripple">
                     <a href="{{url_for('.index',path='/'.join(path_list(path)[:-1]))}}">
                         <div class="mdui-col-xs-12 mdui-col-sm-7">
@@ -68,23 +69,21 @@
                         <div class="mdui-col-sm-2 mdui-text-right"></div>
                     </a>
                 </li>
-                {%endif%}
+            </ul>
+            {%endif%}
             {%for data in items%}
                 {%if data['type']!='folder'%}
                     {%if file_ico(data)=='image'%}
-                    <div class="mdui-col">
-                        <div class="mdui-grid-tile">
-                            <a href="/file/{{data['id']}}" target="_blank">
-                                <img src="/file/{{data['id']}}"/>
-                            </a>
-                        </div>
-                    </div>
+                        <a href="/file/{{data['id']}}" target="_blank">
+                            <img class="mdui-img-fluid" src="/file/{{data['id']}}"/>
+                        </a>
                     {%endif%}
                 {%endif%}
             {%endfor%}
+            {%endif%}
         </div>
     </div>
-    {%endif%}
+
 </div>
 
 <div class="mdui-center">
