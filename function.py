@@ -158,7 +158,7 @@ def Dir(path='/'):
         queue=Queue()
         # queue.put(dict(url=BaseUrl,grandid=grandid,parent=parent,trytime=1))
         g=GetItemThread(queue)
-        g.GetItem(BaseUrl,grandid,parent,trytime)
+        g.GetItem(BaseUrl,grandid,parent,1)
         queue=g.queue
         if queue.qsize()==0:
             return
