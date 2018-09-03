@@ -240,6 +240,7 @@ class GetItemThread(Thread):
 
 
 def UpdateFile():
+    items.remove()
     Dir(share_path)
     print('update file success!')
 
