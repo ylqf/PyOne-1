@@ -231,7 +231,7 @@ class GetItemThread(Thread):
                 self.queue.put(dict(url=data.get('@odata.nextLink'),grandid=grandid,parent=parent,trytime=1))
         except Exception as e:
             trytime+=1
-            print('error to opreate GetItem("{}","{}","{}"),try times :{}, reason: {}'.format(url,grandid,parent,trytime,e))
+            print(u'error to opreate GetItem("{}","{}","{}"),try times :{}, reason: {}'.format(url,grandid,parent,trytime,e))
             if trytime<=3:
                 self.queue.put(dict(url=url,grandid=grandid,parent=parent,trytime=trytime))
 
