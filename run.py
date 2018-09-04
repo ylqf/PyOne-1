@@ -6,6 +6,7 @@ from collections import OrderedDict
 import subprocess
 import hashlib
 import random
+import markdown
 from function import *
 from redis import Redis
 import time
@@ -144,14 +145,14 @@ def _remote_content(fileid):
         else:
             return False
 
-def has_password(path):
+def has_item(path,name):
     if items.count()==0:
         return False
-    password=False
+    item=False
     try:
         if path=='/':
-            if items.find_one({'grandid':0,'name':'.password'}):
-                password=_remote_content(items.find_one({'grandid':0,'name':'.password'})['id']).strip()
+            if items.find_one({'grandid':0,'name':name}):
+                item=_remote_content(items.find_one({'grandid':0,'name':name})['id']).strip()
         else:
             route=path.split('/')
             pid=0
@@ -161,13 +162,13 @@ def has_password(path):
                 else:
                     f=items.find_one({'grandid':idx,'name':r,'parent':pid})
                 pid=f['id']
-            data=items.find_one({'grandid':idx+1,'name':'.password','parent':pid})
+            data=items.find_one({'grandid':idx+1,'name':name,'parent':pid})
             print data
             if data:
-                password=_remote_content(data['id']).strip()
+                item=_remote_content(data['id']).strip()
     except:
-        password=False
-    return password
+        item=False
+    return item
 
 
 def path_list(path):
@@ -196,19 +197,6 @@ def index(path='/'):
     if path=='favicon.ico':
         return redirect('https://www.baidu.com/favicon.ico')
     code=request.args.get('code')
-    page=request.args.get('page',1,type=int)
-    password=has_password(path)
-    md5_p=md5(path)
-    if request.method=="POST":
-        password1=request.form.get('password')
-        if password1==password:
-            resp=make_response(redirect(url_for('.index',path=path)))
-            resp.delete_cookie(md5_p)
-            resp.set_cookie(md5_p,password)
-            return resp
-    if password!=False:
-        if not request.cookies.get(md5_p) or request.cookies.get(md5_p)!=password:
-            return render_template('password.html',path=path)
     if code is not None:
         Atoken=OAuth(code)
         if Atoken.get('access_token'):
@@ -231,19 +219,43 @@ def index(path='/'):
             else:
                 subprocess.Popen('python function.py UpdateFile',shell=True)
                 return make_response('<h1>正在更新数据!</h1>')
-        if request.args.get('image_mode'):
+        #参数
+        page=request.args.get('page',1,type=int)
+        image_mode=request.args.get('image_mode')
+        password=has_item(path,'.password')
+        #是否有密码
+        md5_p=md5(path)
+        if request.method=="POST":
+            password1=request.form.get('password')
+            if password1==password:
+                resp=make_response(redirect(url_for('.index',path=path)))
+                resp.delete_cookie(md5_p)
+                resp.set_cookie(md5_p,password)
+                return resp
+        if password!=False:
+            if not request.cookies.get(md5_p) or request.cookies.get(md5_p)!=password:
+                return render_template('password.html',path=path)
+        #是否看图模式
+        if image_mode:
             image_mode=request.args.get('image_mode',type=int)
-            resp,total = FetchData(path,page)
-            pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
-            resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,endpoint='.index'))
-            resp.set_cookie('image_mode',str(image_mode))
         else:
             image_mode=request.cookies.get('image_mode') if request.cookies.get('image_mode') is not None else 0
             image_mode=int(image_mode)
-            resp,total = FetchData(path,page)
-            pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
-            resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,endpoint='.index'))
-            resp.set_cookie('image_mode',str(image_mode))
+        # README
+        ext='Markdown'
+        readme=has_item(path,'README.md')
+        if readme==False:
+            readme=has_item(path,'readme.md')
+        if readme==False:
+            ext='Text'
+            readme=has_item(path,'readme.txt')
+        if readme!=False:
+            readme=markdown.markdown(readme)
+        #参数
+        resp,total = FetchData(path,page)
+        pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
+        resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,readme=readme,ext=ext,endpoint='.index'))
+        resp.set_cookie('image_mode',str(image_mode))
         return resp
 
 

@@ -1,9 +1,10 @@
-flask 
+flask
 flask_sqlalchemy
-redis 
-pymongo 
+redis
+pymongo
 gunicorn
 humanize
 python-dateutil
 supervisor
 requests
+markdown

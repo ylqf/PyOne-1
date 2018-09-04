@@ -15,11 +15,6 @@
     <div class="nexmoe-item">
         <div class="mdui-row">
             <ul class="mdui-list">
-                <li class="mdui-list-item th">
-                    <div class="mdui-col-xs-12 mdui-col-sm-7">文件</div>
-                    <div class="mdui-col-sm-3 mdui-text-right">修改时间</div>
-                    <div class="mdui-col-sm-2 mdui-text-right">大小</div>
-                </li>
                 {%if path!='/'%}
                 <li class="mdui-list-item mdui-ripple">
                     <a href="{{url_for('.index',path='/'.join(path_list(path)[:-1]))}}">
@@ -31,6 +26,11 @@
                     </a>
                 </li>
                 {%endif%}
+                <li class="mdui-list-item th">
+                    <div class="mdui-col-xs-12 mdui-col-sm-7">文件</div>
+                    <div class="mdui-col-sm-3 mdui-text-right">修改时间</div>
+                    <div class="mdui-col-sm-2 mdui-text-right">大小</div>
+                </li>
             {%for data in items%}
                 {%if data['type']=='folder' %}
                 <li class="mdui-list-item mdui-ripple">
@@ -80,10 +80,10 @@
                     {%endif%}
                 {%endif%}
             {%endfor%}
-            {%endif%}
+        {%endif%}
+        {%include 'readme.html'%}
         </div>
     </div>
-
 </div>
 
 <div class="mdui-center">
