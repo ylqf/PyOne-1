@@ -249,6 +249,9 @@ def index(path='/'):
         if readme==False:
             ext='Text'
             readme=has_item(path,'readme.txt')
+        if readme==False:
+            ext='Text'
+            readme=has_item(path,'README.txt')
         if readme!=False:
             readme=markdown.markdown(readme)
         #参数
