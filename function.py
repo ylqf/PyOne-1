@@ -292,7 +292,7 @@ def _file_content(path,offset,length):
 def _upload(filepath,remote_path): #remote_path like 'share/share.mp4'
     token=GetToken()
     headers={'Authorization':'bearer {}'.format(token)}
-    url=app_url+'_api/v2.0/me/drive/root:/'+remote_path+':/content'
+    url=app_url+'_api/v2.0/me/drive/root:/'+urllib.quote(remote_path)+':/content'
     r=requests.put(url,headers=headers,data=open(filepath,'rb'))
     data=json.loads(r.content)
     if data.get('error'):
@@ -366,7 +366,7 @@ def _GetAllFile(parent_id="",parent_path="",filelist=[]):
 def CreateUploadSession(path):
     token=GetToken()
     headers={'Authorization':'bearer {}'.format(token),'Content-Type':'application/json'}
-    url=app_url+'_api/v2.0/me/drive/root:/'+path+':/createUploadSession'
+    url=app_url+'_api/v2.0/me/drive/root:/'+urllib.quote(path)+':/createUploadSession'
     data={
           "item": {
             "@microsoft.graph.conflictBehavior": "rename",
