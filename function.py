@@ -3,6 +3,8 @@ import json
 import requests
 import collections
 import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
 if sys.version_info[0]==3:
     import urllib.parse as urllib
 else:
@@ -142,11 +144,11 @@ def Dir(path=u'/'):
         parent=''
         if path.endswith('/'):
             path=path[:-1]
-        if path.startswith('/'):
-            path=path[1:]
+        if not path.startswith('/'):
+            path='/'+path
         if items.find_one({'grandid':0,'type':'folder'}):
             parent_id=0
-            for idx,p in enumerate(path.split('/')):
+            for idx,p in enumerate(path[1:].split('/')):
                 if parent_id==0:
                     parent_id=items.find_one({'name':p,'grandid':idx})['id']
                 else:
@@ -155,7 +157,7 @@ def Dir(path=u'/'):
             grandid=idx+1
             parent=parent_id
         path=urllib.quote(path)
-        BaseUrl=app_url+u'_api/v2.0/me/drive/root:/{}:/children?expand=thumbnails'.format(path)
+        BaseUrl=app_url+u'_api/v2.0/me/drive/root:{}:/children?expand=thumbnails'.format(path)
         queue=Queue()
         # queue.put(dict(url=BaseUrl,grandid=grandid,parent=parent,trytime=1))
         g=GetItemThread(queue)
@@ -201,7 +203,6 @@ class GetItemThread(Thread):
             r=requests.get(url,headers=header)
             data=json.loads(r.content)
             values=data.get('value')
-            #print url
             if len(values)>0:
                 for value in values:
                     item={}
@@ -235,6 +236,18 @@ class GetItemThread(Thread):
             print(u'error to opreate GetItem("{}","{}","{}"),try times :{}, reason: {}'.format(url,grandid,parent,trytime,e))
             if trytime<=3:
                 self.queue.put(dict(url=url,grandid=grandid,parent=parent,trytime=trytime))
+
+    def GetItemByPath(self,path):
+        if path=='':
+            path='/'
+        app_url=GetAppUrl()
+        token=GetToken()
+        header={'Authorization': 'Bearer {}'.format(token)}
+        url=app_url+u'_api/v2.0/me/drive/root:{}:/'.format(path)
+        r=requests.get(url,headers=header)
+        data=json.loads(r.content)
+        return data
+
 
 
 
@@ -299,7 +312,7 @@ def _file_content(path,offset,length):
 def _upload(filepath,remote_path): #remote_path like 'share/share.mp4'
     token=GetToken()
     headers={'Authorization':'bearer {}'.format(token)}
-    url=app_url+'_api/v2.0/me/drive/root:/'+urllib.quote(remote_path)+':/content'
+    url=app_url+'_api/v2.0/me/drive/root:'+urllib.quote(remote_path)+':/content'
     r=requests.put(url,headers=headers,data=open(filepath,'rb'))
     data=json.loads(r.content)
     if data.get('error'):
@@ -369,47 +382,53 @@ def _GetAllFile(parent_id="",parent_path="",filelist=[]):
     return filelist
 
 
-def AddResource(remote_path,data):
-    remote_dir,filename='/'.join(remote_path.split('/')[:-1]),remote_path.split('/')[-1]
-    if remote_dir.startswith('/'):
-        remote_dir=remote_dir[1:]
-    if remote_dir=='':
-        item={}
-        item['type']='file'
-        item['name']=convert2unicode(filename)
-        item['id']=convert2unicode(data.get('id'))
-        item['size']=humanize.naturalsize(data.get('size'), gnu=True)
-        item['lastModtime']=humanize.naturaldate(parse(data.get('lastModifiedDateTime')))
-        item['grandid']=0
-        item['parent']=''
-        items.insert_one(item)
-    if items.find_one({'grandid':0,'type':'folder','name':remote_dir.split('/')[0]}):
-        parent_id=0
+def AddResource(data):
+    #检查父文件夹是否在数据库，如果不在则获取添加
+    grand_path=data.get('parentReference').get('path').replace('/drive/root:','')
+    if grand_path=='':
+        parent_id=''
+        grandid=0
+    else:
+        g=GetItemThread(Queue())
+        parent_id=data.get('parentReference').get('id')
+        grandid=len(data.get('parentReference').get('path').replace('/drive/root:','').split('/'))-1
+        grand_path=grand_path[1:]
         parent_path=''
-        for idx,p in enumerate(remote_dir.split('/')):
-            if parent_id==0:
-                parent=items.find_one({'name':p,'grandid':idx})
-                parent_id=parent['id']
+        pid=''
+        for idx,p in enumerate(grand_path.split('/')):
+            parent=items.find_one({'name':p,'grandid':idx,'parent':pid})
+            if parent is not None:
+                pid=parent['id']
                 parent_path='/'.join([parent_path,parent['name']])
             else:
-                parent=items.find_one({'name':p,'grandid':idx,'parent':parent_id})
-                parent_id=parent['id']
-                parent_path='/'.join([parent_path,parent['name']])
-        grandid=idx+1
-        item={}
-        item['type']='file'
-        item['name']=convert2unicode(filename)
-        item['id']=convert2unicode(data.get('id'))
-        item['size']=humanize.naturalsize(data.get('size'), gnu=True)
-        item['lastModtime']=humanize.naturaldate(parse(data.get('lastModifiedDateTime')))
-        item['grandid']=grandid
-        item['parent']=parent_id
-        items.insert_one(item)
+                parent_path='/'.join([parent_path,p])
+                fdata=g.GetItemByPath(parent_path)
+                item={}
+                item['type']='folder'
+                item['name']=fdata.get('name')
+                item['id']=fdata.get('id')
+                item['size']=humanize.naturalsize(fdata.get('size'), gnu=True)
+                item['lastModtime']=humanize.naturaldate(parse(fdata.get('lastModifiedDateTime')))
+                item['grandid']=idx
+                item['parent']=pid
+                items.insert_one(item)
+                pid=fdata.get('id')
+    #插入数据
+    item={}
+    item['type']='file'
+    item['name']=data.get('name')
+    item['id']=data.get('id')
+    item['size']=humanize.naturalsize(data.get('size'), gnu=True)
+    item['lastModtime']=humanize.naturaldate(parse(data.get('lastModifiedDateTime')))
+    item['grandid']=grandid
+    item['parent']=parent_id
+    items.insert_one(item)
+
 
 def CreateUploadSession(path):
     token=GetToken()
     headers={'Authorization':'bearer {}'.format(token),'Content-Type':'application/json'}
-    url=app_url+'_api/v2.0/me/drive/root:/'+urllib.quote(path)+':/createUploadSession'
+    url=app_url+'_api/v2.0/me/drive/root:'+urllib.quote(path)+':/createUploadSession'
     data={
           "item": {
             "@microsoft.graph.conflictBehavior": "rename",
@@ -458,15 +477,15 @@ def Upload(filepath,remote_path=None):
         remote_path=os.path.basename(filepath)
     elif remote_path.endswith('/'):
         remote_path=os.path.join(remote_path,os.path.basename(filepath))
-    if remote_path.startswith('/'):
-        remote_path=remote_path[1:]
+    if not remote_path.startswith('/'):
+        remote_path='/'+remote_path
     if _filesize(filepath)<10485760:
         result=_upload(filepath,remote_path)
         if result==False:
             print(u'{} upload fail!'.format(filepath))
         else:
             print(u'{} upload success!'.format(filepath))
-            AddResource(remote_path,result)
+            AddResource(result)
     else:
         session_data=CreateUploadSession(remote_path)
         if session_data==False:
@@ -475,7 +494,7 @@ def Upload(filepath,remote_path=None):
             if session_data.get('uploadUrl'):
                 uploadUrl=session_data.get('uploadUrl')
                 data=UploadSession(uploadUrl,filepath)
-                AddResource(remote_path,data)
+                AddResource(data)
             else:
                 print(session_data)
                 print('create upload session fail! {}'.format(remote_path))
@@ -547,6 +566,8 @@ def UploadDir(local_dir,remote_dir,threads=5):
         tasks.append(t)
     for t in tasks:
         t.join()
+    #删除错误数据
+    items.remove({'$where':'this.parent==this.id'})
 
 
 
