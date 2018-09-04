@@ -260,8 +260,8 @@ def FileExists(filename):
 def list_all_files(rootdir):
     import os
     _files = []
-    if len(re.findall('[:#\|]+',rootdir))>0:
-        newf=re.sub('[:#\|]+','',rootdir)
+    if len(re.findall('[:#\|\?]+',rootdir))>0:
+        newf=re.sub('[:#\|\?]+','',rootdir)
         shutil.move(rootdir,newf)
         rootdir=newf
     if rootdir.endswith(' '):
