@@ -260,6 +260,13 @@ def FileExists(filename):
 def list_all_files(rootdir):
     import os
     _files = []
+    if len(re.findall('[:#\|]+',rootdir))>0:
+        newf=re.sub('[:#\|]+','',rootdir)
+        shutil.move(rootdir,newf)
+        rootdir=newf
+    if rootdir.endswith(' '):
+        shutil.move(rootdir,rootdir.strip())
+        rootdir=rootdir.strip()
     flist = os.listdir(rootdir) #列出文件夹下所有的目录与文件
     for f in flist:
         path = os.path.join(rootdir,f)
@@ -460,7 +467,7 @@ def UploadDir(local_dir,remote_dir,threads=5):
     print(u'check filename')
     for f in localfiles:
         dir_,fname=os.path.dirname(f),os.path.basename(f)
-        if len(re.findall('[:/#]+',fname))>0:
+        if len(re.findall('[:/#\|]+',fname))>0:
             newf=os.path.join(dir_,re.sub('[:/#\|]+','',fname))
             shutil.move(f,newf)
     localfiles=list_all_files(local_dir)
