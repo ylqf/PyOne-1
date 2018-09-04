@@ -118,10 +118,10 @@ def GetAppUrl():
 def GetExt(name):
     return name.split('.')[-1]
 
-def Dir(path='/'):
+def Dir(path=u'/'):
     app_url=GetAppUrl()
     if path=='/':
-        BaseUrl=app_url+'_api/v2.0/me/drive/root/children?expand=thumbnails'
+        BaseUrl=app_url+u'_api/v2.0/me/drive/root/children?expand=thumbnails'
         items.remove()
         queue=Queue()
         # queue.put(dict(url=BaseUrl,grandid=grandid,parent=parent,trytime=1))
@@ -155,7 +155,7 @@ def Dir(path='/'):
             grandid=idx+1
             parent=parent_id
         path=urllib.quote(path)
-        BaseUrl=app_url+'_api/v2.0/me/drive/root:/{}:/children?expand=thumbnails'.format(path)
+        BaseUrl=app_url+u'_api/v2.0/me/drive/root:/{}:/children?expand=thumbnails'.format(path)
         queue=Queue()
         # queue.put(dict(url=BaseUrl,grandid=grandid,parent=parent,trytime=1))
         g=GetItemThread(queue)
@@ -188,6 +188,7 @@ class GetItemThread(Thread):
             self.GetItem(url,grandid,parent,trytime)
             if self.queue.empty():
                 time.sleep(5) #再等5s
+                print('waiting 5s if queue is not empty')
                 if self.queue.empty():
                     break
 
@@ -240,7 +241,6 @@ class GetItemThread(Thread):
 
 
 def UpdateFile():
-    items.remove()
     Dir(share_path)
     print('update file success!')
 
@@ -357,6 +357,8 @@ def _GetAllFile(parent_id="",parent_path="",filelist=[]):
             fp='/'.join([parent_path,f['name']])
             if fp.startswith('/'):
                 fp=base64.b64encode(fp[1:].encode('utf-8'))
+            else:
+                fp=base64.b64encode(fp.encode('utf-8'))
             filelist.append(fp)
     return filelist
 
@@ -452,8 +454,6 @@ class MultiUpload(Thread):
 
 
 def UploadDir(local_dir,remote_dir,threads=5):
-    if not local_dir.endswith('/'):
-        local_dir=local_dir+'/'
     print(u'geting file from dir {}'.format(local_dir))
     localfiles=list_all_files(local_dir)
     print(u'get {} files from dir {}'.format(len(localfiles),local_dir))
@@ -465,6 +465,8 @@ def UploadDir(local_dir,remote_dir,threads=5):
             shutil.move(f,newf)
     localfiles=list_all_files(local_dir)
     check_file_list=[]
+    if local_dir.endswith('/'):
+        local_dir=local_dir[:-1]
     for file in localfiles:
         dir_,fname=os.path.dirname(file),os.path.basename(file)
         remote_path=remote_dir+'/'+dir_.replace(local_dir,'')+'/'+fname
@@ -497,6 +499,8 @@ def UploadDir(local_dir,remote_dir,threads=5):
         if not cloud_files.get(base64.b64encode(remote_path)):
             queue.put((file,remote_path))
     print "check_file_list {},cloud_files {},queue {}".format(len(check_file_list),len(cloud_files),queue.qsize())
+    print "start upload files 5s later"
+    time.sleep(5)
     for i in range(min(threads,queue.qsize())):
         t=MultiUpload(queue)
         t.start()
