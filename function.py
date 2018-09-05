@@ -563,15 +563,15 @@ def UploadDir(local_dir,remote_dir,threads=5):
             queue.put((file,remote_path))
     print "check_file_list {},cloud_files {},queue {}".format(len(check_file_list),len(cloud_files),queue.qsize())
     print "start upload files 5s later"
-    # time.sleep(5)
-    # for i in range(min(threads,queue.qsize())):
-    #     t=MultiUpload(queue)
-    #     t.start()
-    #     tasks.append(t)
-    # for t in tasks:
-    #     t.join()
-    # #删除错误数据
-    # items.remove({'$where':'this.parent==this.id'})
+    time.sleep(5)
+    for i in range(min(threads,queue.qsize())):
+        t=MultiUpload(queue)
+        t.start()
+        tasks.append(t)
+    for t in tasks:
+        t.join()
+    #删除错误数据
+    items.remove({'$where':'this.parent==this.id'})
 
 
 
