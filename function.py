@@ -278,8 +278,12 @@ def list_all_files(rootdir):
         shutil.move(rootdir,newf)
         rootdir=newf
     if rootdir.endswith(' '):
-        shutil.move(rootdir,rootdir.strip())
-        rootdir=rootdir.strip()
+        shutil.move(rootdir,rootdir.rstrip())
+        rootdir=rootdir.rstrip()
+    if len(re.findall('/ ',rootdir))>0:
+        newf=re.sub('/ ','/',rootdir)
+        shutil.move(rootdir,newf)
+        rootdir=newf
     flist = os.listdir(rootdir) #列出文件夹下所有的目录与文件
     for f in flist:
         path = os.path.join(rootdir,f)
@@ -559,15 +563,15 @@ def UploadDir(local_dir,remote_dir,threads=5):
             queue.put((file,remote_path))
     print "check_file_list {},cloud_files {},queue {}".format(len(check_file_list),len(cloud_files),queue.qsize())
     print "start upload files 5s later"
-    time.sleep(5)
-    for i in range(min(threads,queue.qsize())):
-        t=MultiUpload(queue)
-        t.start()
-        tasks.append(t)
-    for t in tasks:
-        t.join()
-    #删除错误数据
-    items.remove({'$where':'this.parent==this.id'})
+    # time.sleep(5)
+    # for i in range(min(threads,queue.qsize())):
+    #     t=MultiUpload(queue)
+    #     t.start()
+    #     tasks.append(t)
+    # for t in tasks:
+    #     t.join()
+    # #删除错误数据
+    # items.remove({'$where':'this.parent==this.id'})
 
 
 
