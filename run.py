@@ -37,7 +37,8 @@ def FetchData(path='/',page=1,per_page=50,sortby='lastModtime',order='desc'):
     try:
         if path=='/':
             total=items.find({'grandid':0}).count()
-            data=items.find({'grandid':0}).sort([('order',ASCENDING),(sortby,order)])\
+            data=items.find({'grandid':0}).collation({"locale": "zh", 'numericOrdering':True})\
+                .sort([('order',ASCENDING),(sortby,order)])\
                 .limit(per_page).skip((page-1)*per_page)
             for d in data:
                 item={}
@@ -57,7 +58,8 @@ def FetchData(path='/',page=1,per_page=50,sortby='lastModtime',order='desc'):
                     f=items.find_one({'grandid':idx,'name':r,'parent':pid})
                 pid=f['id']
             total=items.find({'grandid':idx+1,'parent':pid}).count()
-            data=items.find({'grandid':idx+1,'parent':pid}).sort([('order',ASCENDING),(sortby,order)])\
+            data=items.find({'grandid':idx+1,'parent':pid}).collation({"locale": "zh", 'numericOrdering':True})\
+                .sort([('order',ASCENDING),(sortby,order)])\
                 .limit(per_page).skip((page-1)*per_page)
             for d in data:
                 item={}
