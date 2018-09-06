@@ -266,6 +266,7 @@ class GetItemThread(Thread):
 
 def UpdateFile():
     Dir(share_path)
+    items.remove()
     print('update file success!')
 
 
@@ -339,7 +340,7 @@ def _upload(filepath,remote_path): #remote_path like 'share/share.mp4'
         print(data)
         return False
 
-def _upload_part(uploadUrl, filepath, offset, length):
+def _upload_part(uploadUrl, filepath, offset, length,trytime=1):
     size=_filesize(filepath)
     offset,length=map(int,(offset,length))
     if offset>size:
@@ -369,7 +370,7 @@ def _upload_part(uploadUrl, filepath, offset, length):
                 return {'status':'fail'
                         ,'msg':'please retry'
                         ,'sys_msg':data.get('error').get('message')
-                        ,'code':2}
+                        ,'code':2,'trytime':trytime}
             else:
                 return {'status':'fail'
                         ,'msg':'retry times limit'
@@ -379,7 +380,7 @@ def _upload_part(uploadUrl, filepath, offset, length):
         trytime+=1
         print('error to opreate _upload_part("{}","{}","{}","{}"), try times {}'.format(uploadUrl, filepath, offset, length,trytime))
         if trytime<=3:
-            return {'status':'fail','msg':'please retry','code':2}
+            return {'status':'fail','msg':'please retry','code':2,'trytime':trytime}
         else:
             return {'status':'fail','msg':'retry times limit','code':3}
 
@@ -465,8 +466,9 @@ def UploadSession(uploadUrl, filepath):
     token=GetToken()
     length=327680*10
     offset=0
+    trytime=1
     while 1:
-        result=_upload_part(uploadUrl, filepath, offset, length)
+        result=_upload_part(uploadUrl, filepath, offset, length,trytime=trytime)
         code=result['code']
         #上传完成
         if code==0:
@@ -478,6 +480,7 @@ def UploadSession(uploadUrl, filepath):
         #错误，重试
         elif code==2:
             offset=offset
+            trytime=result['result']
         #重试超过3次，放弃
         elif code==3:
             break
