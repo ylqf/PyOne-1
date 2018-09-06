@@ -123,6 +123,9 @@ def GetExt(name):
     except:
         return 'file'
 
+def date_to_char(date):
+    return date.strftime('%Y/%m/%d')
+
 def Dir(path=u'/'):
     app_url=GetAppUrl()
     if path=='/':
@@ -215,7 +218,7 @@ class GetItemThread(Thread):
                         item['name']=convert2unicode(value['name'])
                         item['id']=convert2unicode(value['id'])
                         item['size']=humanize.naturalsize(value['size'], gnu=True)
-                        item['lastModtime']=humanize.naturaldate(parse(value['lastModifiedDateTime']))
+                        item['lastModtime']=date_to_char(parse(value['lastModifiedDateTime']))
                         item['grandid']=grandid
                         item['parent']=parent
                         subfodler=items.insert_one(item)
@@ -233,7 +236,7 @@ class GetItemThread(Thread):
                         item['name']=convert2unicode(value['name'])
                         item['id']=convert2unicode(value['id'])
                         item['size']=humanize.naturalsize(value['size'], gnu=True)
-                        item['lastModtime']=humanize.naturaldate(parse(value['lastModifiedDateTime']))
+                        item['lastModtime']=date_to_char(parse(value['lastModifiedDateTime']))
                         item['grandid']=grandid
                         item['parent']=parent
                         items.insert_one(item)
@@ -420,7 +423,7 @@ def AddResource(data):
                 item['name']=fdata.get('name')
                 item['id']=fdata.get('id')
                 item['size']=humanize.naturalsize(fdata.get('size'), gnu=True)
-                item['lastModtime']=humanize.naturaldate(parse(fdata.get('lastModifiedDateTime')))
+                item['lastModtime']=date_to_char(parse(fdata.get('lastModifiedDateTime')))
                 item['grandid']=idx
                 item['parent']=pid
                 items.insert_one(item)
@@ -431,7 +434,7 @@ def AddResource(data):
     item['name']=data.get('name')
     item['id']=data.get('id')
     item['size']=humanize.naturalsize(data.get('size'), gnu=True)
-    item['lastModtime']=humanize.naturaldate(parse(data.get('lastModifiedDateTime')))
+    item['lastModtime']=date_to_char(parse(data.get('lastModifiedDateTime')))
     item['grandid']=grandid
     item['parent']=parent_id
     items.insert_one(item)
