@@ -26,12 +26,19 @@ def md5(string):
     a.update(string.encode(encoding='utf-8'))
     return a.hexdigest()
 
-def FetchData(path='/',page=1,per_page=50):
+def FetchData(path='/',page=1,per_page=50,sortby='lastModtime',order='desc'):
     resp=[]
+    if sortby not in ['lastModtime','type','size','name']:
+        sortby='lastModtime'
+    if order=='desc':
+        order=DESCENDING
+    else:
+        order=ASCENDING
     try:
         if path=='/':
             total=items.find({'grandid':0}).count()
-            data=items.find({'grandid':0}).limit(per_page).skip((page-1)*per_page)
+            data=items.find({'grandid':0}).sort([('order',ASCENDING),(sortby,order)])\
+                .limit(per_page).skip((page-1)*per_page)
             for d in data:
                 item={}
                 item['name']=d['name']
@@ -50,7 +57,8 @@ def FetchData(path='/',page=1,per_page=50):
                     f=items.find_one({'grandid':idx,'name':r,'parent':pid})
                 pid=f['id']
             total=items.find({'grandid':idx+1,'parent':pid}).count()
-            data=items.find({'grandid':idx+1,'parent':pid}).limit(per_page).skip((page-1)*per_page)
+            data=items.find({'grandid':idx+1,'parent':pid}).sort([('order',ASCENDING),(sortby,order)])\
+                .limit(per_page).skip((page-1)*per_page)
             for d in data:
                 item={}
                 item['name']=d['name']
@@ -222,8 +230,10 @@ def index(path='/'):
         #参数
         page=request.args.get('page',1,type=int)
         image_mode=request.args.get('image_mode')
-        password=has_item(path,'.password')
+        sortby=request.args.get('sortby')
+        order=request.args.get('order')
         #是否有密码
+        password=has_item(path,'.password')
         md5_p=md5(path)
         if request.method=="POST":
             password1=request.form.get('password')
@@ -235,12 +245,22 @@ def index(path='/'):
         if password!=False:
             if not request.cookies.get(md5_p) or request.cookies.get(md5_p)!=password:
                 return render_template('password.html',path=path)
-        #是否看图模式
+        #设置cookies
         if image_mode:
             image_mode=request.args.get('image_mode',type=int)
         else:
             image_mode=request.cookies.get('image_mode') if request.cookies.get('image_mode') is not None else 0
             image_mode=int(image_mode)
+        if sortby:
+            sortby=request.args.get('sortby')
+        else:
+            sortby=request.cookies.get('sortby') if request.cookies.get('sortby') is not None else 'lastModtime'
+            sortby=sortby
+        if order:
+            order=request.args.get('order')
+        else:
+            order=request.cookies.get('order') if request.cookies.get('order') is not None else 'desc'
+            order=order
         # README
         ext='Markdown'
         readme=has_item(path,'README.md')
@@ -255,10 +275,12 @@ def index(path='/'):
         if readme!=False:
             readme=markdown.markdown(readme)
         #参数
-        resp,total = FetchData(path,page)
+        resp,total = FetchData(path=path,page=page,per_page=50,sortby=sortby,order=order)
         pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
-        resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,readme=readme,ext=ext,endpoint='.index'))
+        resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,readme=readme,ext=ext,sortby=sortby,order=order,endpoint='.index'))
         resp.set_cookie('image_mode',str(image_mode))
+        resp.set_cookie('sortby',str(sortby))
+        resp.set_cookie('order',str(order))
         return resp
 
 

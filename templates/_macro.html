@@ -36,3 +36,16 @@
 </a>
 
 {% endmacro %}
+
+{% macro Arraw(name,cur_type,sortby,order) %}
+    <a href="{% if order=='asc' %}{{url_for('.index',sortby=cur_type,order='desc',**kwargs)}}{%else%}{{url_for('.index',sortby=cur_type,order='asc',**kwargs)}}{%endif%}">
+    {{ name }}
+    {% if cur_type==sortby %}
+        {% if order=='asc' %}
+            <i class="mdui-icon material-icons">arrow_upward</i>
+        {% else %}
+            <i class="mdui-icon material-icons">arrow_downward</i>
+        {% endif %}
+    {% endif %}
+    </a>
+{% endmacro %}

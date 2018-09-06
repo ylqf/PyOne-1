@@ -20,7 +20,7 @@ from dateutil.parser import parse
 from Queue import Queue
 from threading import Thread
 from config import *
-from pymongo import MongoClient
+from pymongo import MongoClient,ASCENDING,DESCENDING
 ######mongodb
 client = MongoClient('localhost',27017)
 db=client.one2
@@ -118,7 +118,10 @@ def GetAppUrl():
 ###############################onedrive操作函数#################################
 ################################################################################
 def GetExt(name):
-    return name.split('.')[-1]
+    try:
+        return name.split('.')[-1]
+    except:
+        return 'file'
 
 def Dir(path=u'/'):
     app_url=GetAppUrl()
@@ -208,6 +211,7 @@ class GetItemThread(Thread):
                     item={}
                     if value.get('folder'):
                         item['type']='folder'
+                        item['order']=1
                         item['name']=convert2unicode(value['name'])
                         item['id']=convert2unicode(value['id'])
                         item['size']=humanize.naturalsize(value['size'], gnu=True)
@@ -221,7 +225,11 @@ class GetItemThread(Thread):
                             url=app_url+'_api/v2.0/me'+value.get('parentReference').get('path')+'/'+value.get('name')+':/children?expand=thumbnails'
                             self.queue.put(dict(url=url,grandid=grandid+1,parent=item['id'],trytime=1))
                     else:
-                        item['type']='file'
+                        item['type']=GetExt(value['name'])
+                        if GetExt(value['name']) in ['bmp','jpg','jpeg','png','gif']:
+                            item['order']=3
+                        else:
+                            item['order']=2
                         item['name']=convert2unicode(value['name'])
                         item['id']=convert2unicode(value['id'])
                         item['size']=humanize.naturalsize(value['size'], gnu=True)
