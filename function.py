@@ -23,17 +23,16 @@ from config import *
 from pymongo import MongoClient,ASCENDING,DESCENDING
 ######mongodb
 client = MongoClient('localhost',27017)
-db=client.one2
+db=client.one4
 items=db.items
 
 
 #######授权链接
-if od_type=='business':
-    BaseAuthUrl='https://login.microsoftonline.com'
-    ResourceID='https://api.office.com/discovery/'
-elif od_type=='business_21v':
-    BaseAuthUrl='https://login.partner.microsoftonline.cn'
-    ResourceID='00000003-0000-0ff1-ce00-000000000000'
+base=base_dict[od_type]
+BaseAuthUrl=base['BaseAuthUrl']
+ResourceID=base['ResourceID']
+client_id=base['client_id']
+client_secret=base['client_secret']
 
 LoginUrl=BaseAuthUrl+'/common/oauth2/authorize?response_type=code\
 &client_id={client_id}&redirect_uri={redirect_uri}'.format(client_id=client_id,redirect_uri=urllib.quote(redirect_uri))
@@ -68,8 +67,8 @@ def ReFreshToken(refresh_token):
 
 
 def GetToken(Token_file='token.json'):
-    if os.path.exists(os.path.join(config_dir,Token_file)):
-        with open(os.path.join(config_dir,Token_file),'r') as f:
+    if os.path.exists(os.path.join(data_dir,Token_file)):
+        with open(os.path.join(data_dir,Token_file),'r') as f:
             token=json.load(f)
         try:
             if time.time()>int(token.get('expires_on')):
@@ -77,15 +76,15 @@ def GetToken(Token_file='token.json'):
                 refresh_token=token.get('refresh_token')
                 token=ReFreshToken(refresh_token)
                 if token.get('access_token'):
-                    with open(os.path.join(config_dir,Token_file),'w') as f:
+                    with open(os.path.join(data_dir,Token_file),'w') as f:
                         json.dump(token,f,ensure_ascii=False)
         except:
-            with open(os.path.join(config_dir,'Atoken.json'),'r') as f:
+            with open(os.path.join(data_dir,'Atoken.json'),'r') as f:
                 Atoken=json.load(f)
             refresh_token=Atoken.get('refresh_token')
             token=ReFreshToken(refresh_token)
             if token.get('access_token'):
-                    with open(os.path.join(config_dir,Token_file),'w') as f:
+                    with open(os.path.join(data_dir,Token_file),'w') as f:
                         json.dump(token,f,ensure_ascii=False)
         return token.get('access_token')
     else:
@@ -93,8 +92,8 @@ def GetToken(Token_file='token.json'):
 
 def GetAppUrl():
     global app_url
-    if os.path.exists(os.path.join(config_dir,'AppUrl')):
-        with open(os.path.join(config_dir,'AppUrl'),'r') as f:
+    if os.path.exists(os.path.join(data_dir,'AppUrl')):
+        with open(os.path.join(data_dir,'AppUrl'),'r') as f:
             app_url=f.read().strip()
         return app_url
     else:

@@ -78,24 +78,24 @@ def FetchData(path='/',page=1,per_page=50,sortby='lastModtime',order='desc'):
 def _getdownloadurl(id):
     app_url=GetAppUrl()
     token=GetToken()
-    headers={'Authorization':'bearer {}'.format(token),'Content-Type':'application/json'}
-    url=app_url+'_api/v2.0/me/drive/items/'+id
-    r=requests.get(url,headers=headers)
-    data=json.loads(r.content)
-    if data.get('@content.downloadUrl'):
-        return data.get('@content.downloadUrl')
+    headers={'Authorization':'bearer {}'.format(token)}
+    url=app_url+'_api/v2.0/me/drive/items/'+id+'/content'
+    r=requests.head(url,headers=headers)
+    data=r.headers
+    if data.get('Location'):
+        return data.get('Location')
     else:
         return False
 
 def GetDownloadUrl(id):
-    if rd.exists('downloadUrl:{}'.format(id)):
-        downloadUrl,ftime=rd.get('downloadUrl:{}'.format(id)).split('####')
+    if rd.exists('1downloadUrl:{}'.format(id)):
+        downloadUrl,ftime=rd.get('1downloadUrl:{}'.format(id)).split('####')
         if time.time()-int(ftime)>=600:
             print('{} downloadUrl expired!'.format(id))
             downloadUrl=_getdownloadurl(id)
             ftime=int(time.time())
-            k='####'.join([downloadUrl,str(ftime)])
-            rd.set('downloadUrl:{}'.format(id),k)
+            k='#####'.join([downloadUrl,str(ftime)])
+            rd.set('1downloadUrl:{}'.format(id),k)
         else:
             print('get {}\'s downloadUrl from cache'.format(id))
             downloadUrl=downloadUrl
@@ -103,8 +103,8 @@ def GetDownloadUrl(id):
         print('first time get downloadUrl from {}'.format(id))
         downloadUrl=_getdownloadurl(id)
         ftime=int(time.time())
-        k='####'.join([downloadUrl,str(ftime)])
-        rd.set('downloadUrl:{}'.format(id),k)
+        k='#####'.join([downloadUrl,str(ftime)])
+        rd.set('1downloadUrl:{}'.format(id),k)
     return downloadUrl
 
 
@@ -173,7 +173,6 @@ def has_item(path,name):
                     f=items.find_one({'grandid':idx,'name':r,'parent':pid})
                 pid=f['id']
             data=items.find_one({'grandid':idx+1,'name':name,'parent':pid})
-            print data
             if data:
                 item=_remote_content(data['id']).strip()
     except:
@@ -225,9 +224,16 @@ def index(path='/'):
     else:
         if items.count()==0:
             if not os.path.exists('data/token.json'):
-                return make_response('<h1><a href="{}">点击授权账号</a></h1>'.format(LoginUrl))
+                html='''
+                <h1><a href="{}" target="_blank">点击授权账号</a></h1><br>
+                <form action="" method="get">
+                    <input type="text" name="code" placeholder="输入验证码并验证">
+                    <input type="submit" name="提交验证">
+                </form>
+                '''
+                return make_response(html.format(LoginUrl))
             else:
-                subprocess.Popen('python function.py UpdateFile',shell=True)
+                subprocess.Popen('python {} UpdateFile'.format(os.path.join(config_dir,'function.py')),shell=True)
                 return make_response('<h1>正在更新数据!</h1>')
         #参数
         page=request.args.get('page',1,type=int)
@@ -288,28 +294,25 @@ def index(path='/'):
 
 @app.route('/file/<fileid>',methods=['GET','POST'])
 def show(fileid):
+    name=GetName(fileid)
+    ext=name.split('.')[-1]
     if request.method=='POST':
-        name=GetName(fileid)
-        ext=name.split('.')[-1]
         url=request.url.replace(':80','').replace(':443','')
         if ext in ['csv','doc','docx','odp','ods','odt','pot','potm','potx','pps','ppsx','ppsxm','ppt','pptm','pptx','rtf','xls','xlsx']:
             downloadUrl=GetDownloadUrl(fileid)
             url = 'https://view.officeapps.live.com/op/view.aspx?src='+urllib.quote(downloadUrl)
             return redirect(url)
         elif ext in ['bmp','jpg','jpeg','png','gif']:
-            downloadUrl=GetDownloadUrl(fileid)
-            return render_template('show/image.html',downloadUrl=downloadUrl,url=url)
+            return render_template('show/image.html',url=url)
         elif ext in ['mp4','webm']:
-            downloadUrl=GetDownloadUrl(fileid)
-            return render_template('show/video.html',downloadUrl=downloadUrl,url=url)
+            return render_template('show/video.html',url=url)
         elif ext in ['mp4','webm','avi','mpg', 'mpeg', 'rm', 'rmvb', 'mov', 'wmv', 'mkv', 'asf']:
-            downloadUrl=downloadUrl.replace('thumbnail','videomanifest')+'&part=index&format=dash&useScf=True&pretranscode=0&transcodeahead=0'
-            return render_template('show/video2.html',downloadUrl=downloadUrl,url=url)
+            return render_template('show/video2.html',url=url)
+        elif ext in ['avi','mpg', 'mpeg', 'rm', 'rmvb', 'mov', 'wmv', 'mkv', 'asf']:
+            return render_template('show/video2.html',url=url)
         elif ext in ['ogg','mp3','wav']:
-            downloadUrl=GetDownloadUrl(fileid)
-            return render_template('show/audio.html',downloadUrl=downloadUrl,url=url)
+            return render_template('show/audio.html',url=url)
         elif CodeType(ext) is not None:
-            content=_remote_content(fileid)
             return render_template('show/code.html',content=content,url=url,language=CodeType(ext))
         else:
             downloadUrl=GetDownloadUrl(fileid)
@@ -320,6 +323,8 @@ def show(fileid):
             return redirect(downloadUrl)
         if sum([i in referrer for i in allow_site])>0:
             downloadUrl=GetDownloadUrl(fileid)
+            if ext in ['mp4','webm','avi','mpg', 'mpeg', 'rm', 'rmvb', 'mov', 'wmv', 'mkv', 'asf']:
+                downloadUrl=downloadUrl.replace('thumbnail','videomanifest')+'&part=index&format=dash&useScf=True&pretranscode=0&transcodeahead=0'
             return redirect(downloadUrl)
         else:
             return abort(404)
