@@ -88,14 +88,14 @@ def _getdownloadurl(id):
         return False
 
 def GetDownloadUrl(id):
-    if rd.exists('1downloadUrl:{}'.format(id)):
-        downloadUrl,ftime=rd.get('1downloadUrl:{}'.format(id)).split('####')
+    if rd.exists('downloadUrl:{}'.format(id)):
+        downloadUrl,ftime=rd.get('downloadUrl:{}'.format(id)).split('####')
         if time.time()-int(ftime)>=600:
             print('{} downloadUrl expired!'.format(id))
             downloadUrl=_getdownloadurl(id)
             ftime=int(time.time())
-            k='#####'.join([downloadUrl,str(ftime)])
-            rd.set('1downloadUrl:{}'.format(id),k)
+            k='####'.join([downloadUrl,str(ftime)])
+            rd.set('downloadUrl:{}'.format(id),k)
         else:
             print('get {}\'s downloadUrl from cache'.format(id))
             downloadUrl=downloadUrl
@@ -103,8 +103,8 @@ def GetDownloadUrl(id):
         print('first time get downloadUrl from {}'.format(id))
         downloadUrl=_getdownloadurl(id)
         ftime=int(time.time())
-        k='#####'.join([downloadUrl,str(ftime)])
-        rd.set('1downloadUrl:{}'.format(id),k)
+        k='####'.join([downloadUrl,str(ftime)])
+        rd.set('downloadUrl:{}'.format(id),k)
     return downloadUrl
 
 
