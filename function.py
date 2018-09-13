@@ -23,7 +23,7 @@ from config import *
 from pymongo import MongoClient,ASCENDING,DESCENDING
 ######mongodb
 client = MongoClient('localhost',27017)
-db=client.one4
+db=client.one2
 items=db.items
 
 
@@ -259,10 +259,6 @@ class GetItemThread(Thread):
         return data
 
 
-
-
-
-
 def UpdateFile():
     Dir(share_path)
     items.remove()
@@ -279,6 +275,15 @@ def FileExists(filename):
         return False
     else:
         return True
+
+def FileInfo(fileid):
+    token=GetToken()
+    headers={'Authorization':'bearer {}'.format(token),'Content-Type':'application/json'}
+    search_url=app_url+"_api/v2.0/me/drive/items/{}".format(fileid)
+    r=requests.get(search_url,headers=headers)
+    jsondata=json.loads(r.text)
+    return jsondata
+
 
 ################################################上传文件
 def list_all_files(rootdir):
@@ -471,7 +476,6 @@ def UploadSession(uploadUrl, filepath):
         code=result['code']
         #上传完成
         if code==0:
-            break
             return result['info']
         #分片上传成功
         elif code==1:
@@ -479,10 +483,9 @@ def UploadSession(uploadUrl, filepath):
         #错误，重试
         elif code==2:
             offset=offset
-            trytime=result['result']
+            trytime=result['trytime']
         #重试超过3次，放弃
         elif code==3:
-            break
             return False
 
 
@@ -584,9 +587,25 @@ def UploadDir(local_dir,remote_dir,threads=5):
     for t in tasks:
         t.join()
     #删除错误数据
-    items.remove({'$where':'this.parent==this.id'})
+    #items.remove({'$where':'this.parent==this.id'})
 
 
+
+########################删除文件
+def DeleteLocalFile(fileid):
+    items.remove({'id':fileid})
+
+def DeleteRemoteFile(fileid):
+    app_url=GetAppUrl()
+    token=GetToken()
+    headers={'Authorization':'bearer {}'.format(token)}
+    url=app_url+'_api/v2.0/me/drive/items/'+fileid
+    r=requests.delete(url,headers=headers)
+    if r.status_code==204:
+        DeleteLocalFile(fileid)
+        return True
+    else:
+        return False
 
 ########################
 def CheckTimeOut(fileid):

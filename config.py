@@ -2,17 +2,17 @@
 import os
 
 #限制调用域名
-allow_site=['no-referrer'] #如果不限制，则添加：no-referrer
+allow_site=[u'3pp.me']
 
 #######源码目录
 config_dir='/root/PyOne'
 data_dir=os.path.join(config_dir,'data')
 
 #######分享目录
-share_path='/'
+share_path="/"
 
 #onedrive类型设置
-od_type='business_21v' #国际版：bussiness; 世纪互联版：bussiness_21v
+od_type='business' #国际版：bussiness; 世纪互联版：bussiness_21v
 
 #onedrive api设置
 redirect_uri='https://auth.3pp.me/'
@@ -33,9 +33,13 @@ base_dict={
 
 
 #下载链接过期时间
-downloadUrl_timeout=5*60 #默认10分钟过期
+downloadUrl_timeout="300"
 
 #onedrive个人页的域名。国际版为com结尾，世纪互联版为cn结尾，最后面一定要带/
-app_url=u'https://yourname-my.sharepoint.cn/'
+app_url=u'https://ojbkus-my.sharepoint.com/'
 
+#后台密码设置
+password="PyOne"
 
+#网站名称
+title="PyOne"

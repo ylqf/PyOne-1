@@ -1,5 +1,5 @@
 #-*- coding=utf-8 -*-
-from flask import Flask,render_template,redirect,abort,make_response,jsonify,request,url_for
+from flask import Flask,render_template,redirect,abort,make_response,jsonify,request,url_for,Response
 from flask_sqlalchemy import Pagination
 import json
 from collections import OrderedDict
@@ -8,13 +8,23 @@ import hashlib
 import random
 import markdown
 from function import *
+from config import *
 from redis import Redis
+from shelljob import proc
 import time
+import os
 import sys
+import eventlet
+
+eventlet.monkey_patch()
+
 reload(sys)
 sys.setdefaultencoding("utf-8")
+
+
 #######flask
 app=Flask(__name__)
+app.secret_key=os.path.join(config_dir,'PyOne'+password)
 
 rd=Redis(host='localhost',port=6379)
 
@@ -112,6 +122,13 @@ def GetName(id):
     item=items.find_one({'id':id})
     return item['name']
 
+def CanEdit(filename):
+    ext=filename.split('.')[-1]
+    if ext in ["html","htm","php","css","go","java","js","json","txt","sh","md",".password"]:
+        return True
+    else:
+        return False
+
 def CodeType(ext):
     code_type={}
     code_type['html'] = 'html';
@@ -190,6 +207,9 @@ def path_list(path):
     plist=path.split('/')
     plist=['/']+plist
     return plist
+
+
+
 
 ################################################################################
 ###################################试图函数#####################################
@@ -313,6 +333,7 @@ def show(fileid):
         elif ext in ['ogg','mp3','wav']:
             return render_template('show/audio.html',url=url)
         elif CodeType(ext) is not None:
+            content=_remote_content(fileid)
             return render_template('show/code.html',content=content,url=url,language=CodeType(ext))
         else:
             downloadUrl=GetDownloadUrl(fileid)
@@ -330,14 +351,24 @@ def show(fileid):
             return abort(404)
 
 
+######################注册应用
+from admin import admin as admin_blueprint
+app.register_blueprint(admin_blueprint)
 
 
+######################函数
 app.jinja_env.globals['FetchData']=FetchData
 app.jinja_env.globals['path_list']=path_list
+app.jinja_env.globals['CanEdit']=CanEdit
 app.jinja_env.globals['len']=len
 app.jinja_env.globals['enumerate']=enumerate
+app.jinja_env.globals['os']=os
+app.jinja_env.globals['re']=re
 app.jinja_env.globals['file_ico']=file_ico
-app.jinja_env.globals['title']='PyOne'
+app.jinja_env.globals['title']=title
+app.jinja_env.globals['allow_site']=','.join(allow_site)
+app.jinja_env.globals['share_path']=share_path
+app.jinja_env.globals['downloadUrl_timeout']=downloadUrl_timeout
 ################################################################################
 #####################################启动#######################################
 ################################################################################
