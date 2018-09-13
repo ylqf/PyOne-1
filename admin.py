@@ -87,16 +87,14 @@ def setting():
         if password_s is None:
             flash(u'请输入原密码')
         else:
+            new_password=password
             if ((password1 is not None and password2 is None) or (password1 is None and password2 is not None)):
                 flash(u'请输入新密码或者二次确认新密码')
             elif password1 is not None and password2 is not None and password1!=password2:
                 flash(u'两次输入密码不相同')
             elif password1 is not None and password2 is not None and password1==password2:
                 new_password=password1
-            elif password1 is None and password2 is None:
-                new_password=password
             if password_s==password:
-                new_password=password
                 set('title',title)
                 set('downloadUrl_timeout',downloadUrl_timeout)
                 set('share_path',share_path)
@@ -241,6 +239,7 @@ def logout():
 
 @admin.route('/reload',methods=['GET','POST'])
 def reload():
+    config_dir='/root/wbm/'
     cmd='supervisorctl -c {} restart pyone'.format(os.path.join(config_dir,'supervisord.conf'))
     subprocess.Popen(cmd,shell=True)
     flash('正在重启网站...')
