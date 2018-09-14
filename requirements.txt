@@ -8,3 +8,5 @@ python-dateutil
 supervisor
 requests
 markdown
+shelljob
+eventlet
