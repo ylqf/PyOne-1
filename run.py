@@ -176,6 +176,11 @@ def has_item(path,name):
     if items.count()==0:
         return False
     item=False
+    fid=False
+    dz=False
+    cur=False
+    if name=='.password':
+        dz=True
     try:
         if path=='/':
             if items.find_one({'grandid':0,'name':name}):
@@ -186,15 +191,45 @@ def has_item(path,name):
             for idx,r in enumerate(route):
                 if pid==0:
                     f=items.find_one({'grandid':idx,'name':r})
+                    if dz:
+                        p=items.find_one({'grandid':idx,'name':name})
+                        if p:
+                            item=_remote_content(p['id']).strip()
                 else:
                     f=items.find_one({'grandid':idx,'name':r,'parent':pid})
+                    if dz:
+                        p=items.find_one({'grandid':idx,'name':name,'parent':pid})
+                        if p:
+                            item=_remote_content(p['id']).strip()
                 pid=f['id']
             data=items.find_one({'grandid':idx+1,'name':name,'parent':pid})
             if data:
-                item=_remote_content(data['id']).strip()
+                fid=data['id']
+                item=_remote_content(fid).strip()
+                if dz:
+                    cur=True
     except:
         item=False
-    return item
+    return item,fid,cur
+
+
+def verify_pass_before(path):
+    plist=path_list(path)
+    for i in [i for i in range(len(plist))]:
+        n='/'.join(plist[:-i])
+        yield n
+
+def has_verify(path):
+    verify=False
+    for last in verify_pass_before(path):
+        passwd,fid,cur=has_item(last,'.password')
+        if cur:
+            md5_p=md5(last)
+            vp=request.cookies.get(md5_p)
+            if passwd==vp:
+                verify=True
+    return verify
+
 
 
 def path_list(path):
@@ -205,7 +240,6 @@ def path_list(path):
     if path.endswith('/'):
         path=path[:-1]
     plist=path.split('/')
-    plist=['/']+plist
     return plist
 
 
@@ -217,6 +251,15 @@ def path_list(path):
 @app.before_request
 def before_request():
     global referrer
+    try:
+        ip = request.headers['X-Forwarded-For'].split(',')[0]
+    except:
+        ip = request.remote_addr
+    try:
+        ua = request.headers.get('User-Agent')
+    except:
+        ua="null"
+    print '{}:{}:{}'.format(request.endpoint,ip,ua)
     referrer=request.referrer if request.referrer is not None else 'no-referrer'
 
 
@@ -261,8 +304,9 @@ def index(path='/'):
         sortby=request.args.get('sortby')
         order=request.args.get('order')
         #是否有密码
-        password=has_item(path,'.password')
+        password,_,cur=has_item(path,'.password')
         md5_p=md5(path)
+        has_verify_=has_verify(path)
         if request.method=="POST":
             password1=request.form.get('password')
             if password1==password:
@@ -271,7 +315,7 @@ def index(path='/'):
                 resp.set_cookie(md5_p,password)
                 return resp
         if password!=False:
-            if not request.cookies.get(md5_p) or request.cookies.get(md5_p)!=password:
+            if (not request.cookies.get(md5_p) or request.cookies.get(md5_p)!=password) and has_verify_==False:
                 return render_template('password.html',path=path)
         #设置cookies
         if image_mode:
@@ -291,15 +335,15 @@ def index(path='/'):
             order=order
         # README
         ext='Markdown'
-        readme=has_item(path,'README.md')
+        readme,_,i=has_item(path,'README.md')
         if readme==False:
-            readme=has_item(path,'readme.md')
-        if readme==False:
-            ext='Text'
-            readme=has_item(path,'readme.txt')
+            readme,_,i=has_item(path,'readme.md')
         if readme==False:
             ext='Text'
-            readme=has_item(path,'README.txt')
+            readme,_,i=has_item(path,'readme.txt')
+        if readme==False:
+            ext='Text'
+            readme,_,i=has_item(path,'README.txt')
         if readme!=False:
             readme=markdown.markdown(readme)
         #参数

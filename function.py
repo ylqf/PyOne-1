@@ -213,7 +213,7 @@ class GetItemThread(Thread):
                     item={}
                     if value.get('folder'):
                         item['type']='folder'
-                        item['order']=1
+                        item['order']=0
                         item['name']=convert2unicode(value['name'])
                         item['id']=convert2unicode(value['id'])
                         item['size']=humanize.naturalsize(value['size'], gnu=True)
@@ -230,6 +230,8 @@ class GetItemThread(Thread):
                         item['type']=GetExt(value['name'])
                         if GetExt(value['name']) in ['bmp','jpg','jpeg','png','gif']:
                             item['order']=3
+                        elif value['name']=='.password':
+                            item['order']=1
                         else:
                             item['order']=2
                         item['name']=convert2unicode(value['name'])
@@ -495,7 +497,7 @@ def Upload(filepath,remote_path=None):
     headers={'Authorization':'bearer {}'.format(token),'Content-Type':'application/json'}
     if remote_path is None:
         remote_path=os.path.basename(filepath)
-    elif remote_path.endswith('/'):
+    if remote_path.endswith('/'):
         remote_path=os.path.join(remote_path,os.path.basename(filepath))
     if not remote_path.startswith('/'):
         remote_path='/'+remote_path

@@ -3,7 +3,7 @@ from flask import Blueprint,redirect,url_for,request,render_template,flash,sessi
 from flask_sqlalchemy import Pagination
 from function import *
 from config import *
-from run import FetchData,path_list,GetName,CodeType,_remote_content,rd
+from run import FetchData,path_list,GetName,CodeType,_remote_content,rd,has_item,AddResource
 import os
 import io
 import re
@@ -115,7 +115,11 @@ def upload():
         if not os.path.exists(local):
             flash('本地目录/文件不存在')
             return redirect(url_for('admin.upload'))
-        return render_template('admin/upload.html',remote=remote,local=local,action='UploadDir')
+        if os.path.isfile(local):
+            action='Upload'
+        else:
+            action='UploadDir'
+        return render_template('admin/upload.html',remote=remote,local=local,action=action)
     return render_template('admin/upload.html')
 
 
@@ -144,12 +148,12 @@ def manage():
     if sortby:
         sortby=request.args.get('sortby')
     else:
-        sortby=request.cookies.get('sortby') if request.cookies.get('sortby') is not None else 'lastModtime'
+        sortby=request.cookies.get('admin_sortby') if request.cookies.get('admin_sortby') is not None else 'lastModtime'
         sortby=sortby
     if order:
         order=request.args.get('order')
     else:
-        order=request.cookies.get('order') if request.cookies.get('order') is not None else 'desc'
+        order=request.cookies.get('admin_order') if request.cookies.get('admin_order') is not None else 'desc'
         order=order
     resp,total = FetchData(path=path,page=page,per_page=50,sortby=sortby,order=order)
     pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
@@ -169,7 +173,6 @@ def edit():
         app_url=GetAppUrl()
         headers={'Authorization':'bearer {}'.format(token)}
         url=app_url+'_api/v2.0/me/drive/items/{}/content'.format(fileid)
-        print url
         try:
             r=requests.put(url,headers=headers,data=content,timeout=10)
             data=json.loads(r.content)
@@ -194,6 +197,39 @@ def edit():
     return render_template('admin/edit.html',content=content,fileid=fileid,language=language)
 
 
+@admin.route('/setpass',methods=["GET","POST"])
+def setpass():
+    if request.method=='POST':
+        path=request.form.get('path')
+        if not path.startswith('/'):
+            path='/'+path
+        remote_file=os.path.join(path,'.password')
+        content=request.form.get('content').encode('utf-8')
+        info={}
+        token=GetToken()
+        app_url=GetAppUrl()
+        headers={'Authorization':'bearer {}'.format(token)}
+        url=app_url+'_api/v2.0/me/drive/items/root:{}:/content'.format(remote_file)
+        try:
+            r=requests.put(url,headers=headers,data=content,timeout=10)
+            data=json.loads(r.content)
+            AddResource(data)
+            if data.get('@content.downloadUrl'):
+                info['status']=0
+                info['msg']='添加成功'
+            else:
+                info['status']=0
+                info['msg']=data.get('error').get('message')
+        except:
+            info['status']=0
+            info['msg']='超时'
+        return jsonify(info)
+    path=urllib.unquote(request.args.get('path'))
+    _,fid,i=has_item(path,'.password')
+    if fid!=False:
+        return redirect(url_for('admin.edit',fileid=fid))
+    return render_template('admin/setpass.html',path=path)
+
 
 
 @admin.route('/delete',methods=["POST"])
@@ -216,10 +252,6 @@ def delete():
 
 
 
-
-
-
-
 @admin.route('/login',methods=["POST","GET"])
 def login():
     if request.method=='POST':
@@ -239,7 +271,9 @@ def logout():
 
 @admin.route('/reload',methods=['GET','POST'])
 def reload():
+    config_dir='/root/wbm/'
     cmd='supervisorctl -c {} restart pyone'.format(os.path.join(config_dir,'supervisord.conf'))
+    print cmd
     subprocess.Popen(cmd,shell=True)
     flash('正在重启网站...')
     return redirect(url_for('admin.setting'))

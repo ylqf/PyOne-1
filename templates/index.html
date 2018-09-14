@@ -44,10 +44,10 @@
                 </li>
                 {%else%}
                     <li class="mdui-list-item file mdui-ripple">
-                        <a href="/file/{{data['id']}}" target="_blank">
+                        <a href="{{url_for('.show',fileid=data['id'])}}" target="_blank">
                             {%if image_mode==1%}
                                 {%if file_ico(data)=='image'%}
-                                    <img class="mdui-img-fluid" src="/file/{{data['id']}}"/>
+                                    <img class="mdui-img-fluid" src="{{url_for('.show',fileid=data['id'])}}"/>
                                 {%else%}
                                     <div class="mdui-col-xs-8 mdui-col-sm-5 mdui-text-truncate">
                                         <i class="mdui-icon material-icons">{{file_ico(data)}}</i> {{data['name']}}

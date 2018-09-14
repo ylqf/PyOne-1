@@ -27,8 +27,10 @@ a:hover {color: black; text-decoration:none;}
                 </label>
               </th>
                 <th>{{ macros.Admin_Arraw(name='文件',cur_type='name',sortby=sortby,order=order,path=path) }}</th>
+                <th>{{ macros.Admin_Arraw(name='修改时间',cur_type='lastModtime',sortby=sortby,order=order,path=path) }}</th>
                 <th>
-                    <button class="mdui-btn mdui-btn-icon" onclick="delAllProduct()"><i class="mdui-icon material-icons">&#xe872;</i></button>
+                    <button class="mdui-btn mdui-btn-icon" onclick="delAllProduct()" mdui-tooltip="{{'{'}}content: '删除'{{'}'}}"><i class="mdui-icon material-icons">&#xe872;</i></button>
+                    <button class="mdui-btn mdui-btn-icon" onclick="setPasswd('{{path}}')" mdui-tooltip="{{'{'}}content: '设置密码'{{'}'}}"><i class="mdui-icon material-icons">&#xe32a;</i> </button>
                 </th>
             </tr>
           </thead>
@@ -37,10 +39,11 @@ a:hover {color: black; text-decoration:none;}
                 <tr>
                     <td></td>
                     <td>
-                        <a href="{{url_for('admin.manage',path=re.sub('^/+','','/'.join(path_list(path)[:-1])))|safe}}">
+                        <a href="{{url_for('admin.manage',path='/'.join(path_list(path)[:-1]))|safe}}">
                             <i class="mdui-icon material-icons">arrow_upward</i> 返回上一层
                         </a>
                     </td>
+                    <td></td>
                     <td></td>
                 </tr>
                 {%endif%}
@@ -57,6 +60,7 @@ a:hover {color: black; text-decoration:none;}
                               <i class="mdui-icon material-icons">folder_open</i> {{data['name']}}
                             </a>
                       </td>
+                      <td>{{data['lastModtime']}}</td>
                       <td>
                           <button class="mdui-btn mdui-btn-icon"  onclick="delProduct('{{data['id']}}')">
                               <i class="mdui-icon material-icons">&#xe872;</i>
@@ -75,6 +79,7 @@ a:hover {color: black; text-decoration:none;}
                               <i class="mdui-icon material-icons">{{file_ico(data)}}</i> {{data['name']}}
                           </a>
                       </td>
+                      <td>{{data['lastModtime']}}</td>
                       <td>
                           <button class="mdui-btn mdui-btn-icon" onclick="delProduct('{{data['id']}}')">
                             <i class="mdui-icon material-icons">&#xe872;</i>
@@ -191,6 +196,10 @@ a:hover {color: black; text-decoration:none;}
 
   function editFile(id){
     window.open('{{url_for('admin.edit')}}?fileid='+id, '_blank');
+  }
+
+  function setPasswd(path){
+    window.open('{{url_for('admin.setpass')}}?path='+path, '_blank');
   }
 
 </script>
