@@ -271,9 +271,7 @@ def logout():
 
 @admin.route('/reload',methods=['GET','POST'])
 def reload():
-    config_dir='/root/wbm/'
     cmd='supervisorctl -c {} restart pyone'.format(os.path.join(config_dir,'supervisord.conf'))
-    print cmd
     subprocess.Popen(cmd,shell=True)
     flash('正在重启网站...')
     return redirect(url_for('admin.setting'))
