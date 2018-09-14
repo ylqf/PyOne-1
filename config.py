@@ -1,8 +1,8 @@
 #-*- coding=utf-8 -*-
 import os
 
-#限制调用域名
-allow_site=[u'3pp.me']
+#限制调用域名。不限制，则设置为：no-referrer;只需要特定域名，比如3pp.me调用，则设置：3pp.me;可以添加多个域名
+allow_site=[u'no-referrer']
 
 #######源码目录
 config_dir='/root/PyOne'
