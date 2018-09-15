@@ -1,19 +1,30 @@
 #-*- coding=utf-8 -*-
-from flask import Flask,render_template,redirect,abort,make_response,jsonify,request,url_for
+from flask import Flask,render_template,redirect,abort,make_response,jsonify,request,url_for,Response
 from flask_sqlalchemy import Pagination
 import json
 from collections import OrderedDict
 import subprocess
 import hashlib
 import random
+import markdown
 from function import *
+from config import *
 from redis import Redis
+from shelljob import proc
 import time
+import os
 import sys
+import eventlet
+
+eventlet.monkey_patch()
+
 reload(sys)
 sys.setdefaultencoding("utf-8")
+
+
 #######flask
 app=Flask(__name__)
+app.secret_key=os.path.join(config_dir,'PyOne'+password)
 
 rd=Redis(host='localhost',port=6379)
 
@@ -25,12 +36,20 @@ def md5(string):
     a.update(string.encode(encoding='utf-8'))
     return a.hexdigest()
 
-def FetchData(path='/',page=1,per_page=50):
+def FetchData(path='/',page=1,per_page=50,sortby='lastModtime',order='desc'):
     resp=[]
+    if sortby not in ['lastModtime','type','size','name']:
+        sortby='lastModtime'
+    if order=='desc':
+        order=DESCENDING
+    else:
+        order=ASCENDING
     try:
         if path=='/':
             total=items.find({'grandid':0}).count()
-            data=items.find({'grandid':0}).limit(per_page).skip((page-1)*per_page)
+            data=items.find({'grandid':0}).collation({"locale": "zh", 'numericOrdering':True})\
+                .sort([('order',ASCENDING),(sortby,order)])\
+                .limit(per_page).skip((page-1)*per_page)
             for d in data:
                 item={}
                 item['name']=d['name']
@@ -49,7 +68,9 @@ def FetchData(path='/',page=1,per_page=50):
                     f=items.find_one({'grandid':idx,'name':r,'parent':pid})
                 pid=f['id']
             total=items.find({'grandid':idx+1,'parent':pid}).count()
-            data=items.find({'grandid':idx+1,'parent':pid}).limit(per_page).skip((page-1)*per_page)
+            data=items.find({'grandid':idx+1,'parent':pid}).collation({"locale": "zh", 'numericOrdering':True})\
+                .sort([('order',ASCENDING),(sortby,order)])\
+                .limit(per_page).skip((page-1)*per_page)
             for d in data:
                 item={}
                 item['name']=d['name']
@@ -67,12 +88,12 @@ def FetchData(path='/',page=1,per_page=50):
 def _getdownloadurl(id):
     app_url=GetAppUrl()
     token=GetToken()
-    headers={'Authorization':'bearer {}'.format(token),'Content-Type':'application/json'}
-    url=app_url+'_api/v2.0/me/drive/items/'+id
-    r=requests.get(url,headers=headers)
-    data=json.loads(r.content)
-    if data.get('@content.downloadUrl'):
-        return data.get('@content.downloadUrl')
+    headers={'Authorization':'bearer {}'.format(token)}
+    url=app_url+'_api/v2.0/me/drive/items/'+id+'/content'
+    r=requests.head(url,headers=headers)
+    data=r.headers
+    if data.get('Location'):
+        return data.get('Location')
     else:
         return False
 
@@ -100,6 +121,13 @@ def GetDownloadUrl(id):
 def GetName(id):
     item=items.find_one({'id':id})
     return item['name']
+
+def CanEdit(filename):
+    ext=filename.split('.')[-1]
+    if ext in ["html","htm","php","css","go","java","js","json","txt","sh","md",".password"]:
+        return True
+    else:
+        return False
 
 def CodeType(ext):
     code_type={}
@@ -144,30 +172,64 @@ def _remote_content(fileid):
         else:
             return False
 
-def has_password(path):
+def has_item(path,name):
     if items.count()==0:
         return False
-    password=False
+    item=False
+    fid=False
+    dz=False
+    cur=False
+    if name=='.password':
+        dz=True
     try:
         if path=='/':
-            if items.find_one({'grandid':0,'name':'.password'}):
-                password=_remote_content(items.find_one({'grandid':0,'name':'.password'})['id']).strip()
+            if items.find_one({'grandid':0,'name':name}):
+                item=_remote_content(items.find_one({'grandid':0,'name':name})['id']).strip()
         else:
             route=path.split('/')
             pid=0
             for idx,r in enumerate(route):
                 if pid==0:
                     f=items.find_one({'grandid':idx,'name':r})
+                    if dz:
+                        p=items.find_one({'grandid':idx,'name':name})
+                        if p:
+                            item=_remote_content(p['id']).strip()
                 else:
                     f=items.find_one({'grandid':idx,'name':r,'parent':pid})
+                    if dz:
+                        p=items.find_one({'grandid':idx,'name':name,'parent':pid})
+                        if p:
+                            item=_remote_content(p['id']).strip()
                 pid=f['id']
-            data=items.find_one({'grandid':idx+1,'name':'.password','parent':pid})
-            print data
+            data=items.find_one({'grandid':idx+1,'name':name,'parent':pid})
             if data:
-                password=_remote_content(data['id']).strip()
+                fid=data['id']
+                item=_remote_content(fid).strip()
+                if dz:
+                    cur=True
     except:
-        password=False
-    return password
+        item=False
+    return item,fid,cur
+
+
+def verify_pass_before(path):
+    plist=path_list(path)
+    for i in [i for i in range(len(plist))]:
+        n='/'.join(plist[:-i])
+        yield n
+
+def has_verify(path):
+    verify=False
+    for last in verify_pass_before(path):
+        passwd,fid,cur=has_item(last,'.password')
+        if cur:
+            md5_p=md5(last)
+            vp=request.cookies.get(md5_p)
+            if passwd==vp:
+                verify=True
+    return verify
+
 
 
 def path_list(path):
@@ -178,8 +240,10 @@ def path_list(path):
     if path.endswith('/'):
         path=path[:-1]
     plist=path.split('/')
-    plist=['/']+plist
     return plist
+
+
+
 
 ################################################################################
 ###################################试图函数#####################################
@@ -187,6 +251,15 @@ def path_list(path):
 @app.before_request
 def before_request():
     global referrer
+    try:
+        ip = request.headers['X-Forwarded-For'].split(',')[0]
+    except:
+        ip = request.remote_addr
+    try:
+        ua = request.headers.get('User-Agent')
+    except:
+        ua="null"
+    print '{}:{}:{}'.format(request.endpoint,ip,ua)
     referrer=request.referrer if request.referrer is not None else 'no-referrer'
 
 
@@ -196,19 +269,6 @@ def index(path='/'):
     if path=='favicon.ico':
         return redirect('https://www.baidu.com/favicon.ico')
     code=request.args.get('code')
-    page=request.args.get('page',1,type=int)
-    password=has_password(path)
-    md5_p=md5(path)
-    if request.method=="POST":
-        password1=request.form.get('password')
-        if password1==password:
-            resp=make_response(redirect(url_for('.index',path=path)))
-            resp.delete_cookie(md5_p)
-            resp.set_cookie(md5_p,password)
-            return resp
-    if password!=False:
-        if not request.cookies.get(md5_p) or request.cookies.get(md5_p)!=password:
-            return render_template('password.html',path=path)
     if code is not None:
         Atoken=OAuth(code)
         if Atoken.get('access_token'):
@@ -227,48 +287,95 @@ def index(path='/'):
     else:
         if items.count()==0:
             if not os.path.exists('data/token.json'):
-                return make_response('<h1><a href="{}">点击授权账号</a></h1>'.format(LoginUrl))
+                html='''
+                <h1><a href="{}" target="_blank">点击授权账号</a></h1><br>
+                <form action="" method="get">
+                    <input type="text" name="code" placeholder="输入验证码并验证">
+                    <input type="submit" name="提交验证">
+                </form>
+                '''
+                return make_response(html.format(LoginUrl))
             else:
-                subprocess.Popen('python function.py UpdateFile',shell=True)
+                subprocess.Popen('python {} UpdateFile'.format(os.path.join(config_dir,'function.py')),shell=True)
                 return make_response('<h1>正在更新数据!</h1>')
-        if request.args.get('image_mode'):
+        #参数
+        page=request.args.get('page',1,type=int)
+        image_mode=request.args.get('image_mode')
+        sortby=request.args.get('sortby')
+        order=request.args.get('order')
+        #是否有密码
+        password,_,cur=has_item(path,'.password')
+        md5_p=md5(path)
+        has_verify_=has_verify(path)
+        if request.method=="POST":
+            password1=request.form.get('password')
+            if password1==password:
+                resp=make_response(redirect(url_for('.index',path=path)))
+                resp.delete_cookie(md5_p)
+                resp.set_cookie(md5_p,password)
+                return resp
+        if password!=False:
+            if (not request.cookies.get(md5_p) or request.cookies.get(md5_p)!=password) and has_verify_==False:
+                return render_template('password.html',path=path)
+        #设置cookies
+        if image_mode:
             image_mode=request.args.get('image_mode',type=int)
-            resp,total = FetchData(path,page)
-            pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
-            resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,endpoint='.index'))
-            resp.set_cookie('image_mode',str(image_mode))
         else:
             image_mode=request.cookies.get('image_mode') if request.cookies.get('image_mode') is not None else 0
             image_mode=int(image_mode)
-            resp,total = FetchData(path,page)
-            pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
-            resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,endpoint='.index'))
-            resp.set_cookie('image_mode',str(image_mode))
+        if sortby:
+            sortby=request.args.get('sortby')
+        else:
+            sortby=request.cookies.get('sortby') if request.cookies.get('sortby') is not None else 'lastModtime'
+            sortby=sortby
+        if order:
+            order=request.args.get('order')
+        else:
+            order=request.cookies.get('order') if request.cookies.get('order') is not None else 'desc'
+            order=order
+        # README
+        ext='Markdown'
+        readme,_,i=has_item(path,'README.md')
+        if readme==False:
+            readme,_,i=has_item(path,'readme.md')
+        if readme==False:
+            ext='Text'
+            readme,_,i=has_item(path,'readme.txt')
+        if readme==False:
+            ext='Text'
+            readme,_,i=has_item(path,'README.txt')
+        if readme!=False:
+            readme=markdown.markdown(readme)
+        #参数
+        resp,total = FetchData(path=path,page=page,per_page=50,sortby=sortby,order=order)
+        pagination=Pagination(query=None,page=page, per_page=50, total=total, items=None)
+        resp=make_response(render_template('index.html',pagination=pagination,items=resp,path=path,image_mode=image_mode,readme=readme,ext=ext,sortby=sortby,order=order,endpoint='.index'))
+        resp.set_cookie('image_mode',str(image_mode))
+        resp.set_cookie('sortby',str(sortby))
+        resp.set_cookie('order',str(order))
         return resp
 
 
 @app.route('/file/<fileid>',methods=['GET','POST'])
 def show(fileid):
+    name=GetName(fileid)
+    ext=name.split('.')[-1]
     if request.method=='POST':
-        name=GetName(fileid)
-        ext=name.split('.')[-1]
         url=request.url.replace(':80','').replace(':443','')
         if ext in ['csv','doc','docx','odp','ods','odt','pot','potm','potx','pps','ppsx','ppsxm','ppt','pptm','pptx','rtf','xls','xlsx']:
             downloadUrl=GetDownloadUrl(fileid)
             url = 'https://view.officeapps.live.com/op/view.aspx?src='+urllib.quote(downloadUrl)
             return redirect(url)
         elif ext in ['bmp','jpg','jpeg','png','gif']:
-            downloadUrl=GetDownloadUrl(fileid)
-            return render_template('show/image.html',downloadUrl=downloadUrl,url=url)
+            return render_template('show/image.html',url=url)
         elif ext in ['mp4','webm']:
-            downloadUrl=GetDownloadUrl(fileid)
-            return render_template('show/video.html',downloadUrl=downloadUrl,url=url)
+            return render_template('show/video.html',url=url)
         elif ext in ['mp4','webm','avi','mpg', 'mpeg', 'rm', 'rmvb', 'mov', 'wmv', 'mkv', 'asf']:
-            downloadUrl=downloadUrl.replace('thumbnail','videomanifest')+'&part=index&format=dash&useScf=True&pretranscode=0&transcodeahead=0'
-            return render_template('show/video2.html',downloadUrl=downloadUrl,url=url)
+            return render_template('show/video2.html',url=url)
+        elif ext in ['avi','mpg', 'mpeg', 'rm', 'rmvb', 'mov', 'wmv', 'mkv', 'asf']:
+            return render_template('show/video2.html',url=url)
         elif ext in ['ogg','mp3','wav']:
-            downloadUrl=GetDownloadUrl(fileid)
-            return render_template('show/audio.html',downloadUrl=downloadUrl,url=url)
+            return render_template('show/audio.html',url=url)
         elif CodeType(ext) is not None:
             content=_remote_content(fileid)
             return render_template('show/code.html',content=content,url=url,language=CodeType(ext))
@@ -281,19 +388,31 @@ def show(fileid):
             return redirect(downloadUrl)
         if sum([i in referrer for i in allow_site])>0:
             downloadUrl=GetDownloadUrl(fileid)
+            if ext in ['mp4','webm','avi','mpg', 'mpeg', 'rm', 'rmvb', 'mov', 'wmv', 'mkv', 'asf']:
+                downloadUrl=downloadUrl.replace('thumbnail','videomanifest')+'&part=index&format=dash&useScf=True&pretranscode=0&transcodeahead=0'
             return redirect(downloadUrl)
         else:
             return abort(404)
 
 
+######################注册应用
+from admin import admin as admin_blueprint
+app.register_blueprint(admin_blueprint)
 
 
+######################函数
 app.jinja_env.globals['FetchData']=FetchData
 app.jinja_env.globals['path_list']=path_list
+app.jinja_env.globals['CanEdit']=CanEdit
 app.jinja_env.globals['len']=len
 app.jinja_env.globals['enumerate']=enumerate
+app.jinja_env.globals['os']=os
+app.jinja_env.globals['re']=re
 app.jinja_env.globals['file_ico']=file_ico
-app.jinja_env.globals['title']='PyOne'
+app.jinja_env.globals['title']=title
+app.jinja_env.globals['allow_site']=','.join(allow_site)
+app.jinja_env.globals['share_path']=share_path
+app.jinja_env.globals['downloadUrl_timeout']=downloadUrl_timeout
 ################################################################################
 #####################################启动#######################################
 ################################################################################
